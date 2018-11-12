@@ -40,27 +40,29 @@ def launchJob(args):
     # environment variables
     HOME = os.environ['HOME']
     USER = os.environ['USER']
+    SCRATCH = os.environ['SCRATCH']
 
     os.chdir(args['directory'])
 
     # sbatch directive variables
     jobName = 'cromwell_data_preprocessing'
-    outputFile = '{}'.format(os.path.join(HOME, 'cromwell_data_preprocessing.%j.out'))
-    errorFile = '{}'.format(os.path.join(HOME, 'cromwell_data_preprocessing.%j.err'))
+    outputFile = '{}'.format(os.path.join(SCRATCH, 'cromwell_data_preprocessing.%j.out'))
+    errorFile = '{}'.format(os.path.join(SCRATCH, 'cromwell_data_preprocessing.%j.err'))
     nodes = '1'
     memory = '8000' #in MB
     time = '2-00:00:00'
     email = '{}@stanford.edu'.format(USER)
+    mailType = 'END'
     
     # command line execution variables
-    cromwellDirectory = '/home/groups/carilee/cromwell'
-    configPath = os.path.join(cromwellDirectory, 'your.conf')
-    jarPath = os.path.join(cromwellDirectory, 'cromwell-35.jar')
-    scriptPath = os.path.join(cromwellDirectory, 'scripts', 'data_preprocessing.wdl')
-    inputPath = os.path.join(cromwellDirectory, 'inputs', 'data_preprocessing_inputs.json')
+    softwareDirectory = '/home/groups/carilee/software'
+    configPath = os.path.join(softwareDirectory, 'variant-discovery-pipeline', 'your.conf')
+    jarPath = os.path.join(softwareDirectory, 'cromwell-35.jar')
+    scriptPath = os.path.join(softwareDirectory, 'variant-discovery-pipeline', 'scripts', 'data_preprocessing.wdl')
+    inputPath = os.path.join(softwareDirectory, 'variant-discovery-pipeline', 'inputs', 'data_preprocessing_inputs.json')
     wrap = 'java -Dconfig.file={} -jar {} run {} -i {}'.format(configPath, jarPath, scriptPath, inputPath)
 
-    sbatchCommand = 'sbatch --job-name={} --output={} --error={} --nodes={} --mem={} --time={} --mail-user={} --wrap="{}"'.format(jobName, outputFile, errorFile, nodes, memory, time, email, wrap)
+    sbatchCommand = 'sbatch --job-name={} --output={} --error={} --nodes={} --mem={} --time={} --mail-user={} --mail-type={} --wrap="{}"'.format(jobName, outputFile, errorFile, nodes, memory, time, email, mailType, wrap)
 
     stdout = subprocess.run(sbatchCommand, shell=True, stdout=subprocess.PIPE)
     print(stdout.stdout)
