@@ -1,4 +1,7 @@
 # TASK DEFINITIONS
+# NOTES:
+# output_bam_basename is not just the filename. It is the entire
+# path AND the basename without the extension (.whatever)
 task findPairs {
   String directory
   File pairScript
@@ -57,6 +60,41 @@ task markDuplicates {
   }
 }
 
+task sortAndFixTags {
+  # Using SetNmMdAndUqTags instead of SetNmAndUqTags
+  # which was specified in the generic broad workflow
+  # SetNmAndUqTags is depreciated and both serve the same purpose
+  File input_bam
+  String output_bam_basename
+  File ref_dict
+  File ref_fasta
+  File ref_fasta_index
+  String gatk_path
+
+  command <<<
+    set -o pipefail
+    ml system singularity
+    singularity exec ${gatk_path} gatk SortSam \
+      --INPUT ${input_bam} \
+      --OUPUT /dev/stdout \
+      --SORT_ORDER "coordinate" \
+      --CREATE_INDEX false \
+      --CREATE_MD5_FILE false \
+      | \
+    singularity exec ${gatk_path} gatk SetNmMdAndUqTags \
+      --INPUT /dev/stdin \
+      --OUTPUT ${output_bam_basename}.bam \
+      --CREATE_INDEX true \
+      --CREATE_MD5_FILE true \
+      --REFERENCE_SEQUENCE ${ref_fasta}
+  >>>
+  output {
+    File output_bam = "${output_bam_basename}.bam"
+    File output_bam_index = "${output_bam_basename}.bai"
+    File output_bam_md5 = "${output_bam_basename}.bam.md5"
+  }
+}
+
 # WORKFLOW DEFINITION
 workflow PreprocessingForVariantDiscovery {
   File ref_dict
@@ -70,17 +108,27 @@ workflow PreprocessingForVariantDiscovery {
   scatter (pair in output_table) {
     call bwaAlign {
       input: 
-        inputFiles=pair,
-        ref_dict=ref_dict,
-        ref_fasta=ref_fasta,
-        ref_fasta_index=ref_fasta_index
+        inputFiles = pair,
+        ref_dict = ref_dict,
+        ref_fasta = ref_fasta,
+        ref_fasta_index = ref_fasta_index
     }
+    String base_file_name = bwaAlign.output_file_basename
     call markDuplicates {
       input:
-        inputBam=bwaAlign.outputBam,
-        output_bam_basename=bwaAlign.output_file_basename + ".aligned.unsorted.duplicates_marked",
-        metrics_filename=bwaAlign.output_file_basename + ".duplicate_metrics",
-        gatk_path=gatk_path
+        inputBam = bwaAlign.outputBam,
+        output_bam_basename = base_file_name + ".aligned.unsorted.duplicates_marked",
+        metrics_filename = base_file_name + ".duplicate_metrics",
+        gatk_path = gatk_path
+    }
+    call sortAndFixTags {
+      input:
+        input_bam = markDuplicates.output_bam,
+        output_bam_basename = base_file_name + ".aligned.duplicate_marked.sorted",
+        ref_dict = ref_dict,
+        ref_fasta = ref_fasta,
+        ref_fasta_index = ref_fasta_index,
+        gatk_path = gatk_path
     }
   }  
 }
