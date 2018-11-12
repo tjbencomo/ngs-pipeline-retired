@@ -1,0 +1,18 @@
+{
+    
+    "PreprocessingForVariantDiscovery.ref_dict": "/home/groups/carilee/refs/hg19/ucsc.hg19.dict.gz",
+    "PreprocessingForVariantDiscovery.ref_fasta": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta",
+    "PreprocessingForVariantDiscovery.ref_fasta_index": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.fai.gz",
+    "PreprocessingForVariantDiscovery.bwaAlign.ref_sa": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.sa",
+    "PreprocessingForVariantDiscovery.bwaAlign.ref_amb": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.amb",
+    "PreprocessingForVariantDiscovery.bwaAlign.ref_bwt": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.bwt",
+    "PreprocessingForVariantDiscovery.bwaAlign.ref_ann": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.ann",
+    "PreprocessingForVariantDiscovery.bwaAlign.ref_pac": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.pac",
+    
+    
+    
+    "PreprocessingForVariantDiscovery.findPairs.directory": "/scratch/groups/carilee/cromwell-test/",
+    "PreprocessingForVariantDiscovery.findPairs.pairScript": "/home/groups/carilee/software/find_pairings.py",
+    "PreprocessingForVariantDiscovery.bwaAlign.bwa_commandline": "mem -K 100000000 -v 3 -t $SLURM_CPUS_ON_NODE"
+
+}
