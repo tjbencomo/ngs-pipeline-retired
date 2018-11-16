@@ -2,7 +2,7 @@
 {
   "PreProcessingForVariantDiscovery.known_indels_sites_indices": [
     "/home/groups/carilee/refs/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.idx.gz",
-    "gs://broad-references/hg38/v0/Homo_sapiens_assembly38.known_indels.vcf.idx.gz"
+    "/home/groups/carilee/refs/hg19/1000G_phase1.indels.hg19.sites.vcf.idx.gz"
   ],
   "PreProcessingForVariantDiscovery.compression_level": 5,
   "PreProcessingForVariantDiscovery.gatk_path": "/home/groups/carilee/software/gatk4-latest.simg",
