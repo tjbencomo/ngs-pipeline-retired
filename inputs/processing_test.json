@@ -1,0 +1,9 @@
+{
+  "TestingProcessingPipeline.ref_dict": "/home/groups/carilee/refs/hg19/ucsc.hg19.dict.gz",
+  "TestingProcessingPipeline.ref_fasta": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta",
+  "TestingProcessingPipeline.output_bam_basename": "/home/groups/carilee/software/variant-discovery-pipeline/scripts/CTR119",
+  "TestingProcessingPipeline.input_bam": "/scratch/groups/carilee/cromwell-test/CTR119.aligned.unsorted.duplicates_marked.bam",
+  "TestingProcessingPipeline.gatk_path": "/home/groups/carilee/software/gatk4-latest.simg",
+  "TestingProcessingPipeline.ref_fasta_index": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.fai.gz"
+}
+

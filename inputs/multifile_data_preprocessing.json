@@ -16,3 +16,4 @@
     "PreprocessingForVariantDiscovery.bwaAlign.bwa_commandline": "mem -K 100000000 -v 3 -t $SLURM_CPUS_ON_NODE"
 
 }
+

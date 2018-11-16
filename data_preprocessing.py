@@ -41,16 +41,21 @@ def launchJob(args):
     HOME = os.environ['HOME']
     USER = os.environ['USER']
     SCRATCH = os.environ['SCRATCH']
+    PI_SCRATCH = os.environ['PI_SCRATCH']
+
+    cromwell_log_directory = os.path.join(PI_SCRATCH, "cromwell-monitor-logs")
+    if os.path.isdir(cromwell_log_directory) is False:
+        os.mkdir(cromwell_log_directory)
 
     os.chdir(args['directory'])
 
     # sbatch directive variables
     jobName = 'cromwell_data_preprocessing'
-    outputFile = '{}'.format(os.path.join(SCRATCH, 'cromwell_data_preprocessing.%j.out'))
-    errorFile = '{}'.format(os.path.join(SCRATCH, 'cromwell_data_preprocessing.%j.err'))
+    outputFile = '{}'.format(os.path.join(cromwell_log_directory, 'cromwell_data_preprocessing.%j.out'))
+    errorFile = '{}'.format(os.path.join(cromwell_log_directory, 'cromwell_data_preprocessing.%j.err'))
     nodes = '1'
     memory = '8000' #in MB
-    time = '2-00:00:00'
+    time = '3-00:00:00'
     email = '{}@stanford.edu'.format(USER)
     mailType = 'END'
     
