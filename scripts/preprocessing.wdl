@@ -23,6 +23,8 @@ workflow PreProcessingForVariantDiscovery {
     String output_directory
 
     String read_group
+    String platform_unit
+    String platform
 
     call GetBwaVersion {}
 
@@ -32,6 +34,8 @@ workflow PreProcessingForVariantDiscovery {
             fastq_2 = input_fastq_2,
             sample_name = sample_name,
             read_group = read_group,
+            platform_unit = platform_unit,
+            platform = platform,
             output_file_name = base_file_name + ".unaligned.bam",
             gatk_path = gatk_path,
             output_directory = output_directory
@@ -85,9 +89,7 @@ workflow PreProcessingForVariantDiscovery {
 
     call CreateSequenceGroupingTSV {
         input:
-            # this is to avoid having to use the gzip library
-            # and modify the GATK workflow code to handle byte data
-            ref_dict = "/home/groups/carilee/refs/hg19/ucsc.hg19.dict"
+            ref_dict = ref_dict
     }
 
     scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping) {
@@ -106,6 +108,46 @@ workflow PreProcessingForVariantDiscovery {
                 ref_fasta_index = ref_fasta_index,
                 gatk_path = gatk_path,
         }
+    }
+
+    call GatherBqsrReports {
+        input:
+            input_bqsr_reports = BaseRecalibrator.recalibration_report,
+            output_report_file_name = base_file_name + ".recal_data.csv",
+            gatk_path = gatk_path,
+            output_directory = output_directory
+
+    }
+
+    scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping_with_unmapped) {
+        call ApplyBQSR {
+            input:
+                input_bam = SortAndFixTags.output_bam,
+                input_bam_index = SortAndFixTags.output_bam_index,
+                output_bam_base_name = base_file_name + ".aligned.duplicates_marked.recalibrated",
+                recalibration_report = GatherBqsrReports.output_bqsr_report,
+                sequence_group_interval = subgroup,
+                ref_dict = ref_dict,
+                ref_fasta = ref_fasta,
+                ref_fasta_index = ref_fasta_index,
+                gatk_path = gatk_path,
+        }
+    }
+
+    call GatherBamFiles {
+        input:
+            input_bams = ApplyBQSR.recalibrated_bam,
+            output_bam_base_name = base_file_name,
+            output_directory = output_directory,
+            gatk_path = gatk_path
+    }
+
+    output {
+        File duplication_metrics = MarkDuplicates.duplicate_metrics
+        File bqsr_report = GatherBqsrReports.output_bqsr_report
+        File analysis_ready_bam = GatherBamFiles.output_bam
+        File analysis_ready_bam_index = GatherBamFiles.output_bam_index
+        File analysis_ready_bam_md5 = GatherBamFiles.output_bam_md5
     }
 }
 
@@ -130,6 +172,8 @@ task FastqToBam {
 
     String sample_name
     String read_group
+    String platform_unit
+    String platform
 
     String gatk_path
 
@@ -139,8 +183,11 @@ task FastqToBam {
             --FASTQ=${fastq_1} \
             --FASTQ2=${fastq_2} \
             --OUTPUT=${output_directory}${output_file_name} \
+            --PLATFORM_UNIT="${platform_unit}" \
+            --PLATFORM="${platform}" \
             --SAMPLE_NAME=${sample_name} \
             -RG="${read_group}"
+            
     >>>
     output {
         File output_bam = output_directory + output_file_name
@@ -372,14 +419,84 @@ task BaseRecalibrator {
     }
 }
 
+task GatherBqsrReports {
+    Array[File] input_bqsr_reports
 
+    String output_report_file_name
+    String output_directory
+    
+    String gatk_path
 
+    command <<<
+        module load singularity
+        singularity exec ${gatk_path} gatk GatherBQSRReports \
+            -I ${sep=' -I ' input_bqsr_reports} \
+            -O ${output_directory}${output_report_file_name}
+    >>>
+    output {
+        File output_bqsr_report = "${output_directory}${output_report_file_name}"
+    }
+}
+
+task ApplyBQSR {
+    File input_bam
+    File input_bam_index
+    
+    String output_bam_base_name
+
+    File recalibration_report
+
+    Array[String] sequence_group_interval
+
+    File ref_dict
+    File ref_fasta
+    File ref_fasta_index
+
+    String gatk_path
+
+    command <<<
+        module load singularity
+        singularity exec ${gatk_path} gatk ApplyBQSR \
+            -R ${ref_fasta} \
+            -I ${input_bam} \
+            -O ${output_bam_base_name}.bam \
+            -L ${sep=" -L " sequence_group_interval} \
+            -bqsr ${recalibration_report} \
+            --static-quantized-quals 10 --static-quantized-quals 20 --static-quantized-quals 30 \
+            --add-output-sam-program-record \
+            --create-output-bam-md5 \
+            --use-original-qualities
+    >>>
+    output {
+        File recalibrated_bam = "${output_bam_base_name}.bam"
+    }
+}
+
+task GatherBamFiles {
+    Array[File] input_bams
+    String output_bam_base_name
+    String output_directory
+    String gatk_path
+
+    command <<<
+        module load singularity
+        singularity exec ${gatk_path} gatk GatherBamFiles \
+            --INPUT ${sep=' --INPUT ' input_bams} \
+            --OUTPUT ${output_directory}${output_bam_base_name}.bam \
+            --CREATE_INDEX true \
+            --CREATE_MD5_FILE true
+    >>>
+    output {
+        File output_bam = "${output_directory}${output_bam_base_name}.bam"
+        File output_bam_index = "${output_directory}${output_bam_base_name}.bai"
+        File output_bam_md5 = "${output_directory}${output_bam_base_name}.bam.md5"
+    }
+}
 
 # TODO
-# 2) Do BaseRecalibrator Task
 # 3) Do ApplyBQSR Task
 # 4) Look into runtime parameters for tasks
 # 5) Modify data_processing.py for individual samples
-# 6) Should dict not be the .gz version? - Consider just unzipping all the ref files
-# 7) Figure out how SAM/BAMs work and the what the dict is for
 # 8) Document Code and Put README on Github
+# 9) Look into if CreateSequenceGroupingTSV is not running in proper order? Does this matter?
+# 10) Fix FastqToSam parameter abbreviation naming

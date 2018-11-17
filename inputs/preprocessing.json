@@ -1,31 +1,33 @@
 
 {
   "PreProcessingForVariantDiscovery.known_indels_sites_indices": [
-    "/home/groups/carilee/refs/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.idx.gz",
-    "/home/groups/carilee/refs/hg19/1000G_phase1.indels.hg19.sites.vcf.idx.gz"
+    "/home/groups/carilee/refs/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.idx",
+    "/home/groups/carilee/refs/hg19/1000G_phase1.indels.hg19.sites.vcf.idx"
   ],
   "PreProcessingForVariantDiscovery.compression_level": 5,
   "PreProcessingForVariantDiscovery.gatk_path": "/home/groups/carilee/software/gatk4-latest.simg",
   "PreProcessingForVariantDiscovery.sample_name": "CTR119",
-  "PreProcessingForVariantDiscovery.dbSNP_vcf": "/home/groups/carilee/refs/hg19/dbsnp_138.hg19.vcf.gz",
-  "PreProcessingForVariantDiscovery.dbSNP_vcf_index": "/home/groups/carilee/refs/hg19/dbsnp_138.hg19.vcf.idx.gz",
+  "PreProcessingForVariantDiscovery.dbSNP_vcf": "/home/groups/carilee/refs/hg19/dbsnp_138.hg19.vcf",
+  "PreProcessingForVariantDiscovery.dbSNP_vcf_index": "/home/groups/carilee/refs/hg19/dbsnp_138.hg19.vcf.idx",
   "PreProcessingForVariantDiscovery.input_fastq_2": "/scratch/groups/carilee/cromwell-test/short-data/CTR119s_2.fastq.gz",
-  "PreProcessingForVariantDiscovery.ref_dict": "/home/groups/carilee/refs/hg19/ucsc.hg19.dict.gz",
-  "PreProcessingForVariantDiscovery.ref_fasta_index": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.fai.gz",
+  "PreProcessingForVariantDiscovery.ref_dict": "/home/groups/carilee/refs/hg19/ucsc.hg19.dict",
+  "PreProcessingForVariantDiscovery.ref_fasta_index": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.fai",
   "PreProcessingForVariantDiscovery.known_indels_sites_VCFs": 
   [
-    "/home/groups/carilee/refs/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.gz",
-    "/home/groups/carilee/refs/hg19/1000G_phase1.indels.hg19.sites.vcf.gz"
+    "/home/groups/carilee/refs/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf",
+    "/home/groups/carilee/refs/hg19/1000G_phase1.indels.hg19.sites.vcf"
   ],
   "PreProcessingForVariantDiscovery.input_fastq_1": "/scratch/groups/carilee/cromwell-test/short-data/CTR119s_1.fastq.gz",
   "PreProcessingForVariantDiscovery.ref_name": "hg19",
   "PreProcessingForVariantDiscovery.bwa_commandline": "mem -K 100000000 -p -v 3 -t $SLURM_CPUS_ON_NODE -Y",
-  "PreProcessingForVariantDiscovery.ref_fasta": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.gz",
-  "PreProcessingForVariantDiscovery.read_group": "HISEQ_173_C3LAWACXX_1",
+  "PreProcessingForVariantDiscovery.ref_fasta": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta",
+  "PreProcessingForVariantDiscovery.read_group": "C3LAWACXX.1",
+  "PreProcessingForVariantDiscovery.platform_unit": "C3LAWACXX.1.CTR119",
   "PreProcessingForVariantDiscovery.output_directory": "/scratch/groups/carilee/cromwell-test/short-data/",
-  "PreProcessingForVariantDiscovery.SamToFastqAndBwaMem.ref_sa": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.gz.sa",
-  "PreProcessingForVariantDiscovery.SamToFastqAndBwaMem.ref_amb": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.gz.amb",
-  "PreProcessingForVariantDiscovery.SamToFastqAndBwaMem.ref_bwt": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.gz.bwt",
-  "PreProcessingForVariantDiscovery.SamToFastqAndBwaMem.ref_ann": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.gz.ann",
-  "PreProcessingForVariantDiscovery.SamToFastqAndBwaMem.ref_pac": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.gz.pac"
+  "PreProcessingForVariantDiscovery.platform": "ILLUMINA",
+  "PreProcessingForVariantDiscovery.SamToFastqAndBwaMem.ref_sa": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.sa",
+  "PreProcessingForVariantDiscovery.SamToFastqAndBwaMem.ref_amb": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.amb",
+  "PreProcessingForVariantDiscovery.SamToFastqAndBwaMem.ref_bwt": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.bwt",
+  "PreProcessingForVariantDiscovery.SamToFastqAndBwaMem.ref_ann": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.ann",
+  "PreProcessingForVariantDiscovery.SamToFastqAndBwaMem.ref_pac": "/home/groups/carilee/refs/hg19/ucsc.hg19.fasta.pac"
 }
