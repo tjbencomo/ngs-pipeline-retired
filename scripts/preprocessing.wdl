@@ -5,6 +5,10 @@ workflow PreProcessingForVariantDiscovery {
     File input_fastq_1
     File input_fastq_2
     
+    # WARNING: Unzip the all the reference files!!
+    # Some of the command line tools implicitly try to guess
+    # the names of the supporting extension files (i.e. index files)
+    # which they mess up when the file names include .gz
     File ref_fasta
     File ref_fasta_index
     File ref_dict
@@ -158,6 +162,11 @@ task GetBwaVersion {
         grep -e '^Version' | \
         sed 's/Version: //'
     >>>
+    runtime {
+        runtime_minutes: "20"
+        requested_memory_mb_per_core: "1000"
+        cpus: "1"
+    }
     output {
         String version = read_string(stdout())
     }
@@ -182,15 +191,20 @@ task FastqToBam {
         singularity exec ${gatk_path} gatk FastqToSam \
             --FASTQ=${fastq_1} \
             --FASTQ2=${fastq_2} \
-            --OUTPUT=${output_directory}${output_file_name} \
+            --OUTPUT=${output_file_name} \
             --PLATFORM_UNIT="${platform_unit}" \
             --PLATFORM="${platform}" \
             --SAMPLE_NAME=${sample_name} \
             -RG="${read_group}"
             
     >>>
+    runtime {
+        runtime_minutes: "240"
+        requested_memory_mb_per_core: "16000"
+        cpus: 1
+    }
     output {
-        File output_bam = output_directory + output_file_name
+        File output_bam = output_file_name
     }
 }
 
@@ -227,13 +241,18 @@ task SamToFastqAndBwaMem {
             --INTERLEAVE=true \
             --INCLUDE_NON_PF_READS=true \
         | \
-        bwa ${bwa_commandline} ${ref_fasta} /dev/stdin - 2> >(tee ${output_directory}${output_bam_name}.bwa.stderr.log >&2) \
+        bwa ${bwa_commandline} ${ref_fasta} /dev/stdin - 2> >(tee ${output_bam_name}.bwa.stderr.log >&2) \
         | \
-        samtools view -1 - > ${output_directory}${output_bam_name}.bam        
+        samtools view -1 - > ${output_bam_name}.bam        
     >>>
+    runtime {
+        runtime_minutes: "600"
+        requested_memory_mb_per_core: "8000"
+        cpus: "8"
+    }
     output {
-        File output_bam = "${output_directory}${output_bam_name}.bam"
-        File bwa_stderr_log = "${output_directory}${output_bam_name}.bwa.stderr.log"
+        File output_bam = "${output_bam_name}.bam"
+        File bwa_stderr_log = "${output_bam_name}.bwa.stderr.log"
     }
 }
 
@@ -261,7 +280,7 @@ task MergeBamAlignment {
             --ATTRIBUTES_TO_RETAIN X0 \
             --ALIGNED_BAM ${aligned_bam} \
             --UNMAPPED_BAM ${unaligned_bam} \
-            --OUTPUT ${output_directory}${output_bam_name}.bam \
+            --OUTPUT ${output_bam_name}.bam \
             --REFERENCE_SEQUENCE ${ref_fasta} \
             --PAIRED_RUN true \
             --SORT_ORDER "unsorted" \
@@ -280,8 +299,13 @@ task MergeBamAlignment {
             --ALIGNER_PROPER_PAIR_FLAGS true \
             --UNMAP_CONTAMINANT_READS true
     >>>
+    runtime {
+        runtime_minutes: "180"
+        requested_memory_mb_per_core: "16000"
+        cpus: 1
+    }
     output {
-        File output_bam = "${output_directory}${output_bam_name}.bam"
+        File output_bam = "${output_bam_name}.bam"
     }
 }
 
@@ -297,16 +321,21 @@ task MarkDuplicates {
         module load system singularity
         singularity exec ${gatk_path} gatk MarkDuplicates \
             --INPUT ${input_bam} \
-            --OUTPUT ${output_directory}${output_bam_name}.bam \
-            --METRICS_FILE ${output_directory}${metrics_filename} \
+            --OUTPUT ${output_bam_name}.bam \
+            --METRICS_FILE ${metrics_filename} \
             --VALIDATION_STRINGENCY SILENT \
             --OPTICAL_DUPLICATE_PIXEL_DISTANCE 100 \
             --ASSUME_SORT_ORDER "queryname" \
             --CREATE_MD5_FILE true
     >>>
+    runtime {
+        runtime_minutes: "600"
+        requested_memory_mb_per_core: "16000"
+        cpus: "1"
+    }
     output {
-        File output_bam = "${output_directory}${output_bam_name}.bam"
-        File duplicate_metrics = "${output_directory}${metrics_filename}"
+        File output_bam = "${output_bam_name}.bam"
+        File duplicate_metrics = "${metrics_filename}"
     }
 }
 
@@ -331,15 +360,20 @@ task SortAndFixTags {
         | \
         singularity exec ${gatk_path} gatk SetNmMdAndUqTags \
             --INPUT /dev/stdin \
-            --OUTPUT ${output_directory}${output_bam_name}.bam \
+            --OUTPUT ${output_bam_name}.bam \
             --CREATE_INDEX true \
             --CREATE_MD5_FILE true \
             --REFERENCE_SEQUENCE ${ref_fasta}
     >>>
+    runtime {
+        runtime_minutes: "600"
+        requested_memory_mb_per_core: "16000"
+        cpus: "1"
+    }
     output {
-        File output_bam = "${output_directory}${output_bam_name}.bam"
-        File output_bam_index = "${output_directory}${output_bam_name}.bai"
-        File output_bam_md5 = "${output_directory}${output_bam_name}.bam.md5"
+        File output_bam = "${output_bam_name}.bam"
+        File output_bam_index = "${output_bam_name}.bai"
+        File output_bam_md5 = "${output_bam_name}.bam.md5"
     }
 }
 
@@ -382,6 +416,11 @@ task CreateSequenceGroupingTSV {
                 tsv_file_with_unmapped.close()
         CODE
     >>>
+    runtime {
+        runtime_minutes: "20"
+        requested_memory_mb_per_core: "1000"
+        cpus: "1"
+    }
     output {
         Array[Array[String]] sequence_grouping = read_tsv("sequence_grouping.txt")
         Array[Array[String]] sequence_grouping_with_unmapped = read_tsv("sequence_grouping_with_unmapped.txt")
@@ -414,6 +453,11 @@ task BaseRecalibrator {
             --known-sites ${sep=" --known-sites " known_indels_sites_VCFs} \
             -L ${sep=" -L " sequence_group_interval}
     >>>
+    runtime {
+        runtime_minutes: "180"
+        requested_memory_mb_per_core: "8000"
+        cpus: "1"
+    }
     output {
         File recalibration_report = "${recalibration_report_filename}"
     }
@@ -431,10 +475,15 @@ task GatherBqsrReports {
         module load singularity
         singularity exec ${gatk_path} gatk GatherBQSRReports \
             -I ${sep=' -I ' input_bqsr_reports} \
-            -O ${output_directory}${output_report_file_name}
+            -O ${output_report_file_name}
     >>>
+    runtime {
+        runtime_minutes: "240"
+        requested_memory_mb_per_core: "16000"
+        cpus: "1"
+    }
     output {
-        File output_bqsr_report = "${output_directory}${output_report_file_name}"
+        File output_bqsr_report = "${output_report_file_name}"
     }
 }
 
@@ -467,6 +516,11 @@ task ApplyBQSR {
             --create-output-bam-md5 \
             --use-original-qualities
     >>>
+    runtime {
+        runtime_minutes: "180"
+        requested_memory_mb_per_core: "8000"
+        cpus: "1"
+    }
     output {
         File recalibrated_bam = "${output_bam_base_name}.bam"
     }
@@ -482,21 +536,27 @@ task GatherBamFiles {
         module load singularity
         singularity exec ${gatk_path} gatk GatherBamFiles \
             --INPUT ${sep=' --INPUT ' input_bams} \
-            --OUTPUT ${output_directory}${output_bam_base_name}.bam \
+            --OUTPUT ${output_bam_base_name}.bam \
             --CREATE_INDEX true \
             --CREATE_MD5_FILE true
     >>>
+    runtime {
+        runtime_minutes: "240"
+        requested_memory_mb_per_core: "16000"
+        cpus: "1"
+    }
     output {
-        File output_bam = "${output_directory}${output_bam_base_name}.bam"
-        File output_bam_index = "${output_directory}${output_bam_base_name}.bai"
-        File output_bam_md5 = "${output_directory}${output_bam_base_name}.bam.md5"
+        File output_bam = "${output_bam_base_name}.bam"
+        File output_bam_index = "${output_bam_base_name}.bai"
+        File output_bam_md5 = "${output_bam_base_name}.bam.md5"
     }
 }
 
 # TODO
-# 3) Do ApplyBQSR Task
-# 4) Look into runtime parameters for tasks
-# 5) Modify data_processing.py for individual samples
-# 8) Document Code and Put README on Github
-# 9) Look into if CreateSequenceGroupingTSV is not running in proper order? Does this matter?
-# 10) Fix FastqToSam parameter abbreviation naming
+# 1) Look into runtime parameters for tasks
+# 2) Modify data_processing.py for individual samples
+# 3) Look into if CreateSequenceGroupingTSV is not running in proper order? Does this matter?
+# 4) Fix FastqToSam parameter abbreviation naming
+# 5) Clean up repo
+# 6) Look at AnalyzeCovariates on full sample run
+# 7) Add copy task to move over necessary files - https://github.com/broadinstitute/cromwell/issues/1641
