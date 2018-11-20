@@ -188,10 +188,12 @@ task FastqToBam {
 
     command <<<
         module load system singularity
+        (ls ${fastq_1} && echo yes) || echo no
+        (ls ${fastq_2} && echo yes) || echo no
         singularity exec ${gatk_path} gatk FastqToSam \
             --FASTQ=${fastq_1} \
             --FASTQ2=${fastq_2} \
-            --OUTPUT=${output_file_name} \
+            --OUTPUT=${output_directory}${output_file_name} \
             --PLATFORM_UNIT="${platform_unit}" \
             --PLATFORM="${platform}" \
             --SAMPLE_NAME=${sample_name} \
@@ -200,11 +202,11 @@ task FastqToBam {
     >>>
     runtime {
         runtime_minutes: "240"
-        requested_memory_mb_per_core: "16000"
+        requested_memory_mb_per_core: "8000"
         cpus: 1
     }
     output {
-        File output_bam = output_file_name
+        File output_bam = output_directory + output_file_name
     }
 }
 
@@ -241,18 +243,18 @@ task SamToFastqAndBwaMem {
             --INTERLEAVE=true \
             --INCLUDE_NON_PF_READS=true \
         | \
-        bwa ${bwa_commandline} ${ref_fasta} /dev/stdin - 2> >(tee ${output_bam_name}.bwa.stderr.log >&2) \
+        bwa ${bwa_commandline} ${ref_fasta} /dev/stdin - 2> >(tee ${output_directory}${output_bam_name}.bwa.stderr.log >&2) \
         | \
-        samtools view -1 - > ${output_bam_name}.bam        
+        samtools view -1 - > ${output_directory}${output_bam_name}.bam        
     >>>
     runtime {
-        runtime_minutes: "600"
+        runtime_minutes: "300"
         requested_memory_mb_per_core: "8000"
-        cpus: "8"
+        cpus: "4"
     }
     output {
-        File output_bam = "${output_bam_name}.bam"
-        File bwa_stderr_log = "${output_bam_name}.bwa.stderr.log"
+        File output_bam = "${output_directory}${output_bam_name}.bam"
+        File bwa_stderr_log = "${output_directory}${output_bam_name}.bwa.stderr.log"
     }
 }
 
@@ -266,9 +268,6 @@ task MergeBamAlignment {
     File ref_fasta
     File ref_fasta_index
     File ref_dict
-    # Added in as it seems MergeBamAlignment can't identify the .gz version of dict
-    # Look into this in the future
-    File ref_dict2 = "/home/groups/carilee/refs/hg19/ucsc.hg19.dict"
 
     String gatk_path
 
@@ -280,7 +279,7 @@ task MergeBamAlignment {
             --ATTRIBUTES_TO_RETAIN X0 \
             --ALIGNED_BAM ${aligned_bam} \
             --UNMAPPED_BAM ${unaligned_bam} \
-            --OUTPUT ${output_bam_name}.bam \
+            --OUTPUT ${output_directory}${output_bam_name}.bam \
             --REFERENCE_SEQUENCE ${ref_fasta} \
             --PAIRED_RUN true \
             --SORT_ORDER "unsorted" \
@@ -305,7 +304,7 @@ task MergeBamAlignment {
         cpus: 1
     }
     output {
-        File output_bam = "${output_bam_name}.bam"
+        File output_bam = "${output_directory}${output_bam_name}.bam"
     }
 }
 
@@ -321,8 +320,8 @@ task MarkDuplicates {
         module load system singularity
         singularity exec ${gatk_path} gatk MarkDuplicates \
             --INPUT ${input_bam} \
-            --OUTPUT ${output_bam_name}.bam \
-            --METRICS_FILE ${metrics_filename} \
+            --OUTPUT ${output_directory}${output_bam_name}.bam \
+            --METRICS_FILE ${output_directory}${metrics_filename} \
             --VALIDATION_STRINGENCY SILENT \
             --OPTICAL_DUPLICATE_PIXEL_DISTANCE 100 \
             --ASSUME_SORT_ORDER "queryname" \
@@ -334,8 +333,8 @@ task MarkDuplicates {
         cpus: "1"
     }
     output {
-        File output_bam = "${output_bam_name}.bam"
-        File duplicate_metrics = "${metrics_filename}"
+        File output_bam = "${output_directory}${output_bam_name}.bam"
+        File duplicate_metrics = "${output_directory}${metrics_filename}"
     }
 }
 
@@ -360,7 +359,7 @@ task SortAndFixTags {
         | \
         singularity exec ${gatk_path} gatk SetNmMdAndUqTags \
             --INPUT /dev/stdin \
-            --OUTPUT ${output_bam_name}.bam \
+            --OUTPUT ${output_directory}${output_bam_name}.bam \
             --CREATE_INDEX true \
             --CREATE_MD5_FILE true \
             --REFERENCE_SEQUENCE ${ref_fasta}
@@ -371,9 +370,9 @@ task SortAndFixTags {
         cpus: "1"
     }
     output {
-        File output_bam = "${output_bam_name}.bam"
-        File output_bam_index = "${output_bam_name}.bai"
-        File output_bam_md5 = "${output_bam_name}.bam.md5"
+        File output_bam = "${output_directory}${output_bam_name}.bam"
+        File output_bam_index = "${output_directory}${output_bam_name}.bai"
+        File output_bam_md5 = "${output_directory}${output_bam_name}.bam.md5"
     }
 }
 
@@ -475,7 +474,7 @@ task GatherBqsrReports {
         module load singularity
         singularity exec ${gatk_path} gatk GatherBQSRReports \
             -I ${sep=' -I ' input_bqsr_reports} \
-            -O ${output_report_file_name}
+            -O ${output_directory}${output_report_file_name}
     >>>
     runtime {
         runtime_minutes: "240"
@@ -483,7 +482,7 @@ task GatherBqsrReports {
         cpus: "1"
     }
     output {
-        File output_bqsr_report = "${output_report_file_name}"
+        File output_bqsr_report = "${output_directory}${output_report_file_name}"
     }
 }
 
@@ -536,7 +535,7 @@ task GatherBamFiles {
         module load singularity
         singularity exec ${gatk_path} gatk GatherBamFiles \
             --INPUT ${sep=' --INPUT ' input_bams} \
-            --OUTPUT ${output_bam_base_name}.bam \
+            --OUTPUT ${output_directory}${output_bam_base_name}.bam \
             --CREATE_INDEX true \
             --CREATE_MD5_FILE true
     >>>
@@ -546,17 +545,13 @@ task GatherBamFiles {
         cpus: "1"
     }
     output {
-        File output_bam = "${output_bam_base_name}.bam"
-        File output_bam_index = "${output_bam_base_name}.bai"
-        File output_bam_md5 = "${output_bam_base_name}.bam.md5"
+        File output_bam = "${output_directory}${output_bam_base_name}.bam"
+        File output_bam_index = "${output_directory}${output_bam_base_name}.bai"
+        File output_bam_md5 = "${output_directory}${output_bam_base_name}.bam.md5"
     }
 }
 
 # TODO
-# 1) Look into runtime parameters for tasks
-# 2) Modify data_processing.py for individual samples
-# 3) Look into if CreateSequenceGroupingTSV is not running in proper order? Does this matter?
-# 4) Fix FastqToSam parameter abbreviation naming
-# 5) Clean up repo
-# 6) Look at AnalyzeCovariates on full sample run
-# 7) Add copy task to move over necessary files - https://github.com/broadinstitute/cromwell/issues/1641
+# 2) Fix FastqToSam parameter abbreviation naming
+# 3) Look at AnalyzeCovariates on full sample run
+# 4) Add copy task to move over necessary files - https://github.com/broadinstitute/cromwell/issues/1641

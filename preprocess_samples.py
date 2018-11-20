@@ -72,15 +72,18 @@ def launchPreprocessingJob(sample, sampleFiles, directory):
     if os.path.isdir(cromwell_log_directory) is False:
         os.mkdir(cromwell_log_directory)
 
-    # Modify input file
-    cromwellInputFile = os.path.join(directory, 'preprocessing_{}.json'.format(sample))
+	# Set working directory to cromwell log directory - cromwell log subfolders will get created here
+    os.chdir(cromwell_log_directory)
+	
+	# Modify input file
+    inputPath = os.path.join(directory, 'preprocessing_{}.json'.format(sample))
     # Get Read group info
     ID, PU, PL = getReadGroupInfo(sampleFiles['fastq1'], sample)
     replacements = {'SAMPLE_NAME_HERE': sample, 'FASTQ1_HERE': sampleFiles['fastq1'], 
                     'FASTQ2_HERE':sampleFiles['fastq2'], 'OUTPUT_DIRECTORY_HERE' : directory,
                     'READ_GROUP_HERE' : ID, 'PLATFORM_UNIT_HERE': PU, 'PLATFORM_HERE': PL}
 
-    with open(PREPROCESSING_INPUT_FILE) as infile, open(cromwellInputFile, 'w') as outfile:
+    with open(PREPROCESSING_INPUT_FILE) as infile, open(inputPath, 'w') as outfile:
         for line in infile:
             for src, target in replacements.items():
                 line = line.replace(src, target)
@@ -101,8 +104,8 @@ def launchPreprocessingJob(sample, sampleFiles, directory):
     configPath = os.path.join(softwareDirectory, 'variant-discovery-pipeline', 'your.conf') # currently not using as SLURM isn't working
     jarPath = os.path.join(softwareDirectory, 'cromwell-35.jar')
     scriptPath = os.path.join(softwareDirectory, 'variant-discovery-pipeline', 'scripts', 'preprocessing.wdl')
-    inputPath = os.path.join(softwareDirectory, 'variant-discovery-pipeline', 'inputs', 'preprocessing.json')
     wrap = 'java -jar {} run {} -i {}'.format(jarPath, scriptPath, inputPath)
+    #wrap = 'java -Dconfig.file={} -jar {} run {} -i {}'.format(configPath, jarPath, scriptPath, inputPath)
 
     # launch process
     sbatchCommand = 'sbatch --job-name={} --output={} --error={} --nodes={} --mem={} --time={} --mail-user={} --mail-type={} --wrap="{}"'.format(jobName, outputFile, errorFile, nodes, memory, time, email, mailType, wrap)
