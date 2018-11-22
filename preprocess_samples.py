@@ -22,7 +22,7 @@ def parseArgs():
         directory = ''.join(args.directory)
 
     if os.path.isdir(directory) is False:
-        raise ValueError("Directory does not exist!")
+        raise ValueError("{} directory does not exist!")
     
     return {'directory' : directory}
 
@@ -57,7 +57,7 @@ def getReadGroupInfo(fastqFile, sample):
 
     return readGroupID, readGroupPlatformUnit, readGroupPlatform
 
-def launchPreprocessingJob(sample, sampleFiles, directory):
+def launchCromwellJob(sample, sampleFiles, directory):
     '''
     Preconditions:
         sampleFiles : Dict with 2 key values: fastq1, fastq2 containing file paths to input fastq.gz files
@@ -89,13 +89,15 @@ def launchPreprocessingJob(sample, sampleFiles, directory):
                 line = line.replace(src, target)
             outfile.write(line)
 
+    # print("Created inputs file")
+
     # sbatch directive variables
     jobName = 'cromwell_preprocessing'
     outputFile = '{}'.format(os.path.join(cromwell_log_directory, 'cromwell_preprocessing.%j.out'))
     errorFile = '{}'.format(os.path.join(cromwell_log_directory, 'cromwell_preprocessing.%j.err'))
     nodes = '1'
     memory = '32000' #in MB
-    time = '1-00:00:00'
+    time = '0-06:00:00'
     email = '{}@stanford.edu'.format(USER)
     mailType = 'END'
 
@@ -104,8 +106,8 @@ def launchPreprocessingJob(sample, sampleFiles, directory):
     configPath = os.path.join(softwareDirectory, 'variant-discovery-pipeline', 'your.conf') # currently not using as SLURM isn't working
     jarPath = os.path.join(softwareDirectory, 'cromwell-35.jar')
     scriptPath = os.path.join(softwareDirectory, 'variant-discovery-pipeline', 'scripts', 'preprocessing.wdl')
-    wrap = 'java -jar {} run {} -i {}'.format(jarPath, scriptPath, inputPath)
-    #wrap = 'java -Dconfig.file={} -jar {} run {} -i {}'.format(configPath, jarPath, scriptPath, inputPath)
+    #wrap = 'java -jar {} run {} -i {}'.format(jarPath, scriptPath, inputPath)
+    wrap = 'java -Dconfig.file={} -jar {} run {} -i {}'.format(configPath, jarPath, scriptPath, inputPath)
 
     # launch process
     sbatchCommand = 'sbatch --job-name={} --output={} --error={} --nodes={} --mem={} --time={} --mail-user={} --mail-type={} --wrap="{}"'.format(jobName, outputFile, errorFile, nodes, memory, time, email, mailType, wrap)
@@ -115,11 +117,22 @@ def launchPreprocessingJob(sample, sampleFiles, directory):
 
 def launchJobs(samples, directory):
     for sample in samples:
-        launchPreprocessingJob(sample, samples[sample], directory)
+        launchCromwellJob(sample, samples[sample], directory)
+
+def launchBashJob(sample, sampleFiles, directory):
+    '''
+    Preconditions:
+        sampleFiles : Dict with 2 key values: fastq1, fastq2 containing file paths to input fastq.gz files
+    '''
+    # Check if a directory to store all the customized sbatch scripts exists - if not make one
+    # Create customized sbatch script for this sample
+    # Submit job
 
 def main():
     args = parseArgs()
+    # print("Parsed args")
     samples = getSamples(args['directory'])
+    # print("Parsed samples")
     launchJobs(samples, args['directory'])
 
 if __name__ == '__main__':
