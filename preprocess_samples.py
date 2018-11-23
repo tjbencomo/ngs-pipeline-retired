@@ -83,11 +83,7 @@ def launchCromwellJob(sample, sampleFiles, directory):
                     'FASTQ2_HERE':sampleFiles['fastq2'], 'OUTPUT_DIRECTORY_HERE' : directory,
                     'READ_GROUP_HERE' : ID, 'PLATFORM_UNIT_HERE': PU, 'PLATFORM_HERE': PL}
 
-    with open(PREPROCESSING_INPUT_FILE) as infile, open(inputPath, 'w') as outfile:
-        for line in infile:
-            for src, target in replacements.items():
-                line = line.replace(src, target)
-            outfile.write(line)
+    createCustomizedFile(PREPROCESSING_INPUT_FILE, inputPath, replacements)
 
     # print("Created inputs file")
 
@@ -115,18 +111,51 @@ def launchCromwellJob(sample, sampleFiles, directory):
     stdout = subprocess.run(sbatchCommand, shell=True, stdout=subprocess.PIPE)
     print(stdout.stdout)
 
-def launchJobs(samples, directory):
-    for sample in samples:
-        launchCromwellJob(sample, samples[sample], directory)
+def launchJobs(samples, directory, workflow_type='bash'):
+    if workflow_type == 'bash':
+        for sample in samples:
+            launchBashJob(sample, samples[sample], directory)
+    elif workflow_type == 'cromwell':
+        for sample in samples:
+            launchCromwellJob(sample, samples[sample], directory)
 
-def launchBashJob(sample, sampleFiles, directory):
+def createCustomizedFile(template_file, customized_file, replacements):
+    with open(template_file) as infile, open(customized_file, 'w') as outfile:
+        for line in infile:
+            for src, target in replacements.items():
+                line = line.replace(src, target)
+            outfile.write(line)
+
+    return customized_file
+
+def launchBashJob(sample, sampleFiles, directory, reference_assembly='hg19', cores='8', memory='48000'):
     '''
     Preconditions:
         sampleFiles : Dict with 2 key values: fastq1, fastq2 containing file paths to input fastq.gz files
     '''
     # Check if a directory to store all the customized sbatch scripts exists - if not make one
+    scriptsDirectory = os.path.join(directory, 'jobScripts')
+    if os.path.isdir(scriptsDirectory) is False:
+        os.mkdir(scriptsDirectory)
+
     # Create customized sbatch script for this sample
+    TEMPLATE_SCRIPT = "/home/groups/carilee/software/preprocessing_template.sh"
+    USER = os.environ['USER']
+    customizedScript = os.path.join(scriptsDirectory, 'preprocessing_{}.sh'.format(sample))
+
+    ID, PU, PL = getReadGroupInfo(sampleFiles['fastq1'], sample)
+    replacements = {'_SAMPLE_NAME_': sample, '_FASTQ1_FILE_': sampleFiles['fastq1'], 
+                    '_FASTQ2_FILE_':sampleFiles['fastq2'], '_WORKING_DIRECTORY_' : directory,
+                    '_READ_GROUP_' : ID, '_PLATFORM_UNIT_': PU, '_PLATFORM_': PL, 
+                    '_REFERENCE_NAME_': reference_assembly, '_CORES_': cores, '_MEMORY_': memory,
+                    '_USER_': USER}
+
+    createCustomizedFile(TEMPLATE_SCRIPT, customizedScript, replacements)
+
     # Submit job
+    stdout = subprocess.run('sbatch {}'.format(customizedScript), shell=True, stdout=subprocess.PIPE)
+    print(stdout.stdout)
+
 
 def main():
     args = parseArgs()
