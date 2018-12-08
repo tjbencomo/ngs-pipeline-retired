@@ -9,6 +9,9 @@ def createParser():
     parser.add_argument('-d', '--directory', type=str, nargs=1, 
                         help='Specify directory to launch workflow from, saving execution files to this directory',
                         dest='directory')
+    parser.add_argument('-i', '--inputFile', type=str, nargs=1,
+                        help='File containing list of file names to process. All files must be from the same directory, 1 filename per line. Specify full path for inputFile',
+                        dest='inputFile')
 
     args = parser.parse_args()
     return args
@@ -23,17 +26,25 @@ def parseArgs():
 
     if os.path.isdir(directory) is False:
         raise ValueError("{} directory does not exist!")
-    
-    return {'directory' : directory}
 
-def getSamples(directory):
+    if args.inputFile is None:
+        inputFile = None
+    else:
+        inputFile = ''.join(args.inputFile)
+    
+    return {'directory' : directory, 'inputFile' : inputFile}
+
+def getSamples(directory, files=None):
     '''
     Preconditions: 
         All files to be preprocessed end with .fastq.gz
         File pairs are formated such that pairs are distinguished by the suffix _X.fastq.gz
         such that CTR119_1.fastq.gz and CTR119_2.fastq.gz are a pair
+        files must be a list containing file names to process. Absolute full paths should not be included, just the name
     '''
-    files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and f.endswith('.fastq.gz')]
+    if files is None:
+        files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and f.endswith('.fastq.gz')]        
+
 
     samples = {}
     for f in files:
@@ -49,9 +60,13 @@ def getReadGroupInfo(fastqFile, sample):
     '@HISEQ_173_C3LAWACXX:1:1101:1127:2116#0/1'
     f = gzip.open(fastqFile, 'r')
     headerLine = f.readline().decode("utf-8") 
-    headerLine = re.split('_|:|#', headerLine)
+    readGroupTag = 'RG:Z:'
+    if readGroupTag in headerLine:
+        readGroupID = headerLine[headerLine.find(readGroupTag)+len(readGroupTag):].rstrip('\n')
+    else:
+        headerLine = re.split('_|:|#', headerLine)
+        readGroupID = headerLine[2] + "." + headerLine[3]
 
-    readGroupID = headerLine[2] + "." + headerLine[3]
     readGroupPlatformUnit = readGroupID + "." + sample
     readGroupPlatform = "ILLUMINA"
 
@@ -139,16 +154,17 @@ def launchBashJob(sample, sampleFiles, directory, reference_assembly='hg19', cor
         os.mkdir(scriptsDirectory)
 
     # Create customized sbatch script for this sample
-    TEMPLATE_SCRIPT = "/home/groups/carilee/software/preprocessing_template.sh"
+    TEMPLATE_SCRIPT = "/home/groups/carilee/software/variant-discovery-pipeline/preprocessing_template.sh"
     USER = os.environ['USER']
     customizedScript = os.path.join(scriptsDirectory, 'preprocessing_{}.sh'.format(sample))
+    logFile = os.path.join(directory, 'preprocessing_log.txt')
 
     ID, PU, PL = getReadGroupInfo(sampleFiles['fastq1'], sample)
     replacements = {'_SAMPLE_NAME_': sample, '_FASTQ1_FILE_': sampleFiles['fastq1'], 
                     '_FASTQ2_FILE_':sampleFiles['fastq2'], '_WORKING_DIRECTORY_' : directory,
                     '_READ_GROUP_' : ID, '_PLATFORM_UNIT_': PU, '_PLATFORM_': PL, 
                     '_REFERENCE_NAME_': reference_assembly, '_CORES_': cores, '_MEMORY_': memory,
-                    '_USER_': USER}
+                    '_USER_': USER, '_LOG_FILE_': logFile}
 
     createCustomizedFile(TEMPLATE_SCRIPT, customizedScript, replacements)
 
@@ -156,13 +172,23 @@ def launchBashJob(sample, sampleFiles, directory, reference_assembly='hg19', cor
     stdout = subprocess.run('sbatch {}'.format(customizedScript), shell=True, stdout=subprocess.PIPE)
     print(stdout.stdout)
 
+def read_input_file(filepath):
+    files = []
+    with open(filepath, 'r') as f:
+        files = f.readlines()
+        files = [f.rstrip('\n') for f in files]
+    return files
 
 def main():
     args = parseArgs()
-    # print("Parsed args")
-    samples = getSamples(args['directory'])
-    # print("Parsed samples")
-    launchJobs(samples, args['directory'])
 
+    if args['inputFile'] is not None:
+        files = read_input_file(args['inputFile'])
+    else:
+        files = None
+    
+    samples = getSamples(args['directory'], files)
+    launchJobs(samples, args['directory'])
+    
 if __name__ == '__main__':
     main()

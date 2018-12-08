@@ -188,9 +188,9 @@ task FastqToBam {
 
     command <<<
         module load system singularity
-        (ls ${fastq_1} && echo yes) || echo no
-        (ls ${fastq_2} && echo yes) || echo no
-        singularity exec ${gatk_path} gatk FastqToSam \
+        echo ${fastq_1}
+        echo ${fastq_2}
+        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk FastqToSam \
             --FASTQ=${fastq_1} \
             --FASTQ2=${fastq_2} \
             --OUTPUT=${output_directory}${output_file_name} \
@@ -201,7 +201,7 @@ task FastqToBam {
             
     >>>
     runtime {
-        runtime_minutes: "240"
+        runtime_minutes: "180"
         requested_memory_mb_per_core: "8000"
         cpus: 1
     }
@@ -237,7 +237,9 @@ task SamToFastqAndBwaMem {
         module load biology bwa
         module load biology samtools
 
-        singularity exec ${gatk_path} gatk SamToFastq \
+        echo ${input_bam}
+
+        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk SamToFastq \
             --INPUT=${input_bam} \
             --FASTQ=/dev/stdout \
             --INTERLEAVE=true \
@@ -273,7 +275,9 @@ task MergeBamAlignment {
 
     command <<<
         module load system singularity
-        singularity exec ${gatk_path} gatk MergeBamAlignment \
+        echo ${aligned_bam}
+        echo ${unaligned_bam}
+        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk MergeBamAlignment \
             --VALIDATION_STRINGENCY SILENT \
             --EXPECTED_ORIENTATIONS FR \
             --ATTRIBUTES_TO_RETAIN X0 \
@@ -318,7 +322,7 @@ task MarkDuplicates {
 
     command <<<
         module load system singularity
-        singularity exec ${gatk_path} gatk MarkDuplicates \
+        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk MarkDuplicates \
             --INPUT ${input_bam} \
             --OUTPUT ${output_directory}${output_bam_name}.bam \
             --METRICS_FILE ${output_directory}${metrics_filename} \
@@ -350,14 +354,14 @@ task SortAndFixTags {
     command <<<
         set -o pipefail
         module load singularity
-        singularity exec ${gatk_path} gatk SortSam \
+        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk SortSam \
             --INPUT ${input_bam} \
             --OUTPUT /dev/stdout \
             --SORT_ORDER "coordinate" \
             --CREATE_INDEX false \
             --CREATE_MD5_FILE false \
         | \
-        singularity exec ${gatk_path} gatk SetNmMdAndUqTags \
+        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk SetNmMdAndUqTags \
             --INPUT /dev/stdin \
             --OUTPUT ${output_directory}${output_bam_name}.bam \
             --CREATE_INDEX true \
@@ -443,7 +447,7 @@ task BaseRecalibrator {
 
     command <<<
         module load singularity
-        singularity exec ${gatk_path} gatk BaseRecalibrator \
+        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk BaseRecalibrator \
             -R ${ref_fasta} \
             -I ${input_bam} \
             --use-original-qualities \
@@ -472,7 +476,7 @@ task GatherBqsrReports {
 
     command <<<
         module load singularity
-        singularity exec ${gatk_path} gatk GatherBQSRReports \
+        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk GatherBQSRReports \
             -I ${sep=' -I ' input_bqsr_reports} \
             -O ${output_directory}${output_report_file_name}
     >>>
@@ -504,7 +508,7 @@ task ApplyBQSR {
 
     command <<<
         module load singularity
-        singularity exec ${gatk_path} gatk ApplyBQSR \
+        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk ApplyBQSR \
             -R ${ref_fasta} \
             -I ${input_bam} \
             -O ${output_bam_base_name}.bam \
@@ -533,7 +537,7 @@ task GatherBamFiles {
 
     command <<<
         module load singularity
-        singularity exec ${gatk_path} gatk GatherBamFiles \
+        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk GatherBamFiles \
             --INPUT ${sep=' --INPUT ' input_bams} \
             --OUTPUT ${output_directory}${output_bam_base_name}.bam \
             --CREATE_INDEX true \
