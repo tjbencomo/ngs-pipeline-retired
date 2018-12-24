@@ -92,8 +92,9 @@ def launchJob(sample, sampleFiles, directory, cores="1", memory="48000", normalT
     logFile = os.path.join(directory, 'SNV_calling_log.txt')
     
     '''This needs to be modified!'''
-    #pon_filepath = '/scratch/groups/carilee/cromwell-test/mutect-tests/5WESpon.vcf.gz'
-    pon_filepath = '/scratch/groups/carilee/forTomas/CollagenFQData/alldata/PanelofNormals/28WESpon.vcf.gz'
+    pon_filepath = '/scratch/groups/carilee/forTomas/CollagenFQData/alldata/PanelofNormals/20SouthWES_PON.vcf.gz'
+    #pon_filepath = '/scratch/groups/carilee/forTomas/CollagenFQData/alldata/PanelofNormals/5WES_multiplex_PON.vcf.gz'
+    #pon_filepath = '/scratch/groups/carilee/forTomas/CollagenFQData/alldata/PanelofNormals/28WESpon.vcf.gz'
     replacements = {'_SAMPLE_NAME_': str(sample), '_CORES_': cores, '_MEMORY_': memory,
                     '_TUMOR_BAM_' : sampleFiles['Tumor'],
                     '_TUMOR_NAME_' : "{}{}".format(tumorTag, sample),

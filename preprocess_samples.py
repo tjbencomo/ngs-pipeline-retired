@@ -43,18 +43,40 @@ def getSamples(directory, files=None):
         files must be a list containing file names to process. Absolute full paths should not be included, just the name
     '''
     if files is None:
-        files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and f.endswith('.fastq.gz')]        
-
+        files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and f.endswith('.fastq')]        
 
     samples = {}
     for f in files:
-        if '_1.' in f:
-            sampleName = f[0:f.find('_1.')]
-            match = f[0:f.rfind('_1.')] + "_2" + f[f.find('.'):]
+        if '_1' in f:
+            sampleName = f[0:f.find('_1')]
+            match = f[0:f.rfind('_1')] + "_2_removed_RG" + f[f.find('.'):]
             if match in files:
                 samples[sampleName] = {'fastq1' : os.path.join(directory, f), 'fastq2' : os.path.join(directory, match)} 
 
     return samples
+
+def parseSavedRGData(infoFilepath):
+    sampleInfo = {} 
+    with open(infoFilepath, 'r') as f:
+        lines = f.readlines()
+        lines = [line.rstrip('\n') for line in lines]
+        for line in lines:
+            split = line.split('=')
+            sample = split[0][:split[0].find('_')]
+            sampleRead = split[1][split[1].find('Z:')+2:]
+            if sample in sampleInfo:
+                if sampleRead != sampleInfo[sample]:
+                    raise ValueError("Different read graups for sample {}".format(sample))
+            sampleInfo[sample] = sampleRead
+    return sampleInfo
+
+def nonZippedGetReadGroupInfo(sample, readGroupInfo):
+    readGroupID = readGroupInfo[sample] 
+
+    readGroupPlatformUnit = readGroupID + "." + sample
+    readGroupPlatform = "ILLUMINA"
+
+    return readGroupID, readGroupPlatformUnit, readGroupPlatform
 
 def getReadGroupInfo(fastqFile, sample):
     '@HISEQ_173_C3LAWACXX:1:1101:1127:2116#0/1'
@@ -126,10 +148,10 @@ def launchCromwellJob(sample, sampleFiles, directory):
     stdout = subprocess.run(sbatchCommand, shell=True, stdout=subprocess.PIPE)
     print(stdout.stdout)
 
-def launchJobs(samples, directory, workflow_type='bash'):
+def launchJobs(samples, directory, workflow_type='bash', readGroupInfo=None):
     if workflow_type == 'bash':
         for sample in samples:
-            launchBashJob(sample, samples[sample], directory)
+            launchBashJob(sample, samples[sample], directory, readGroupInfo=readGroupInfo)
     elif workflow_type == 'cromwell':
         for sample in samples:
             launchCromwellJob(sample, samples[sample], directory)
@@ -143,7 +165,7 @@ def createCustomizedFile(template_file, customized_file, replacements):
 
     return customized_file
 
-def launchBashJob(sample, sampleFiles, directory, reference_assembly='hg19', cores='8', memory='48000'):
+def launchBashJob(sample, sampleFiles, directory, reference_assembly='hg19', cores='8', memory='48000', readGroupInfo=None):
     '''
     Preconditions:
         sampleFiles : Dict with 2 key values: fastq1, fastq2 containing file paths to input fastq.gz files
@@ -159,7 +181,8 @@ def launchBashJob(sample, sampleFiles, directory, reference_assembly='hg19', cor
     customizedScript = os.path.join(scriptsDirectory, 'preprocessing_{}.sh'.format(sample))
     logFile = os.path.join(directory, 'preprocessing_log.txt')
 
-    ID, PU, PL = getReadGroupInfo(sampleFiles['fastq1'], sample)
+    #ID, PU, PL = getReadGroupInfo(sampleFiles['fastq1'], sample)
+    ID, PU, PL = nonZippedGetReadGroupInfo(sample, readGroupInfo)
     replacements = {'_SAMPLE_NAME_': sample, '_FASTQ1_FILE_': sampleFiles['fastq1'], 
                     '_FASTQ2_FILE_':sampleFiles['fastq2'], '_WORKING_DIRECTORY_' : directory,
                     '_READ_GROUP_' : ID, '_PLATFORM_UNIT_': PU, '_PLATFORM_': PL, 
@@ -186,9 +209,11 @@ def main():
         files = read_input_file(args['inputFile'])
     else:
         files = None
-    
+    removedRGDirectory = '/scratch/groups/carilee/forTomas/CollagenFQData/alldata/rg_removed_fqs' 
+    infoFile = os.path.join(removedRGDirectory, 'RG_info.txt')
+    info = parseSavedRGData(infoFile)
     samples = getSamples(args['directory'], files)
-    launchJobs(samples, args['directory'])
+    launchJobs(samples, args['directory'], readGroupInfo=info)
     
 if __name__ == '__main__':
     main()

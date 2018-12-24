@@ -5,8 +5,8 @@
 #SBATCH --nodes=1
 #SBATCH --mem=_MEMORY_
 #SBATCH --cpus-per-task=_CORES_
-#SBATCH --time=0-08:00:00
-#SBATCH --mail-type=END
+#SBATCH --time=0-18:00:00
+#SBATCH --mail-type=FAIL
 #SBATCH --mail-user=_USER_@stanford.edu
 #SBATCH --workdir=_WORKING_DIRECTORY_
 
@@ -15,7 +15,6 @@
 set -o pipefail
 set -e
 
-module load singularity
 module load biology samtools
 module load biology bwa
 
@@ -43,7 +42,7 @@ PLATFORM=_PLATFORM_
 
 BWA_VERSION=0.7.17-r1188
 
-GATK_PATH=/home/groups/carilee/software/gatk4-latest.simg
+GATK_PATH=/scratch/groups/carilee/containers/gatk_latest.sif
 
 BASE_FILE_NAME=${SAMPLE_NAME}.${REF_NAME}
 
@@ -53,7 +52,7 @@ echo "Preprocessing ${SAMPLE_NAME}"
 
 UNALIGNED_BAM=${BASE_FILE_NAME}.unaligned.bam
 
-singularity exec ${GATK_PATH} gatk FastqToSam \
+singularity exec -B $PI_SCRATCH ${GATK_PATH} gatk FastqToSam \
             --FASTQ=${FASTQ1} \
             --FASTQ2=${FASTQ2} \
             --OUTPUT=${UNALIGNED_BAM} \
@@ -68,7 +67,7 @@ BWA_COMMANDLINE="mem -K 100000000 -p -v 3 -t ${SLURM_CPUS_ON_NODE} -Y"
 
 UNMERGED_BAM=${BASE_FILE_NAME}.unmerged.bam
 
-singularity exec ${GATK_PATH} gatk SamToFastq \
+singularity exec -B $PI_SCRATCH ${GATK_PATH} gatk SamToFastq \
             --INPUT=${UNALIGNED_BAM} \
             --FASTQ=/dev/stdout \
             --INTERLEAVE=true \
@@ -82,7 +81,7 @@ singularity exec ${GATK_PATH} gatk SamToFastq \
 
 ALIGNED_BAM=${BASE_FILE_NAME}.aligned.unsorted.bam
 
-singularity exec ${GATK_PATH} gatk MergeBamAlignment \
+singularity exec -B $PI_SCRATCH ${GATK_PATH} gatk MergeBamAlignment \
             --VALIDATION_STRINGENCY SILENT \
             --EXPECTED_ORIENTATIONS FR \
             --ATTRIBUTES_TO_RETAIN X0 \
@@ -112,7 +111,7 @@ singularity exec ${GATK_PATH} gatk MergeBamAlignment \
 MARKED_BAM=${BASE_FILE_NAME}.aligned.unsorted.duplicates_marked.bam
 METRICS_FILE=${BASE_FILE_NAME}.duplicate_metrics
 
-singularity exec ${GATK_PATH} gatk MarkDuplicates \
+singularity exec -B $PI_SCRATCH ${GATK_PATH} gatk MarkDuplicates \
             --INPUT ${ALIGNED_BAM} \
             --OUTPUT ${MARKED_BAM} \
             --METRICS_FILE ${METRICS_FILE} \
@@ -125,14 +124,14 @@ singularity exec ${GATK_PATH} gatk MarkDuplicates \
 
 SORTED_BAM=${BASE_FILE_NAME}.aligned.duplicate_marked.sorted.bam
 
-singularity exec ${GATK_PATH} gatk SortSam \
+singularity exec -B $PI_SCRATCH ${GATK_PATH} gatk SortSam \
             --INPUT ${MARKED_BAM} \
             --OUTPUT /dev/stdout \
             --SORT_ORDER "coordinate" \
             --CREATE_INDEX false \
             --CREATE_MD5_FILE false \
 | \
-singularity exec ${GATK_PATH} gatk SetNmMdAndUqTags \
+singularity exec -B $PI_SCRATCH ${GATK_PATH} gatk SetNmMdAndUqTags \
     --INPUT /dev/stdin \
     --OUTPUT ${SORTED_BAM} \
     --CREATE_INDEX true \
@@ -147,7 +146,7 @@ RECALIBRATION_REPORT_FILE=${BASE_FILE_NAME}.recal_data.csv
 MILLS_INDELS=/home/groups/carilee/refs/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf
 PHASE_1_INDELS=/home/groups/carilee/refs/hg19/1000G_phase1.indels.hg19.sites.vcf
 
-singularity exec  ${GATK_PATH} gatk BaseRecalibrator \
+singularity exec  -B $PI_SCRATCH ${GATK_PATH} gatk BaseRecalibrator \
     -R ${REF_FASTA} \
     -I ${SORTED_BAM} \
     --use-original-qualities \
@@ -160,7 +159,7 @@ singularity exec  ${GATK_PATH} gatk BaseRecalibrator \
 
 ANALYSIS_READY_BAM=${BASE_FILE_NAME}.bam
 
-singularity exec ${GATK_PATH} gatk ApplyBQSR \
+singularity exec -B $PI_SCRATCH ${GATK_PATH} gatk ApplyBQSR \
     -R ${REF_FASTA} \
     -I ${SORTED_BAM} \
     -O ${ANALYSIS_READY_BAM} \

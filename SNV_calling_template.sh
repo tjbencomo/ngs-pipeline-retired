@@ -10,8 +10,6 @@
 #SBATCH --mail-user=_USER_@stanford.edu
 #SBATCH --workdir=_WORKING_DIRECTORY_
 
-module load singularity
-
 sample_name=_SAMPLE_NAME_
 
 tumor_bam=_TUMOR_BAM_
@@ -32,7 +30,7 @@ output_bam=${sample_name}_tumor_normal_m2.bam
 
 log_file=_LOG_FILE_
 
-gatk_path=/home/groups/carilee/software/gatk4-latest.simg
+gatk_path=/scratch/groups/carilee/containers/gatk_latest.sif
 
 # Stop script if any of the commands error out
 set -e
