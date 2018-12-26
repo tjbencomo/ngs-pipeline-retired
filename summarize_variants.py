@@ -1,8 +1,8 @@
 '''Author: Tomas Bencomo
-Summarizes variants for one or more variant call format files.
+Summarizes variants for one or more variant call format files 
+annotated with annovar refSeq db.
 '''
 import os
-import sys
 import argparse
 
 import vcf as pyvcf
