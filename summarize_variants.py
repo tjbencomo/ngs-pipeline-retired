@@ -2,6 +2,7 @@
 Summarizes variants for one or more variant call format files.
 '''
 import os
+import sys
 import argparse
 
 import vcf as pyvcf
@@ -12,7 +13,7 @@ GENE_NAME = 'Gene.refGene'
 MUTATION_TYPE = 'ExonicFunc.refGene'
 VARIANT_TYPE = 'Func.refGene'
 
-def build_position_summary(vcf_filepath, variant_summary=None):
+def summarize_vcf_by_position(vcf_filepath, variant_summary=None):
     """Summarize variants by position.
     Returns variant summary as dict with position for keys
     """
@@ -56,10 +57,11 @@ def summarize_by_position(vcfs):
     """Summarize list of vcfs by position and return summary dict"""
     variant_summary = {}
     for vcf in vcfs:
-        variant_summary = build_position_summary(vcf, variant_summary)
+        variant_summary = summarize_vcf_by_position(vcf, variant_summary)
+        print('Summarized {} by coordinate!'.format(vcf))
     return variant_summary
 
-def build_gene_summary(vcf_filepath, variant_summary=None):
+def summarize_vcf_by_gene(vcf_filepath, variant_summary=None):
     """Summarize variants by gene and returns variant summary as dict with genes for keys"""
     vcf_reader = pyvcf.Reader(open(vcf_filepath, 'r'))
     if variant_summary is None:
@@ -122,16 +124,25 @@ def summarize_by_gene(vcfs):
     """Summarize list of vcf filenames by gene and return summary dict"""
     variant_summary = {}
     for vcf in vcfs:
-        variant_summary = build_gene_summary(vcf, variant_summary)
+        variant_summary = summarize_vcf_by_gene(vcf, variant_summary)
+        print('Summarized {} by gene!'.format(vcf))
     return variant_summary
 
-def save_summary(variant_summary, filename):
-    summary_table = build_summary_table(variant_summary)
-    summary_table.to_csv(filename)
-
-def build_summary_table(variant_summary):
-    """Convert summary dict to pandas DataFrame - return DataFrame with genes as indices"""
+def build_summary_table(variant_summary, summary_type='coordinate'):
+    """Convert summary dict to pandas DataFrame.
+    summary_type specifies whether the summary is 'gene' or 'coordinate' based.
+    Defaults to coordinate based summary.
+    Return DataFrame with either genes or coordinates as indices
+    """
     df = pd.DataFrame.from_dict(variant_summary, orient='index')
+    df['NumberOfSCCs'] = df['Sample'].apply(set).apply(len)
+    if summary_type == 'gene':
+        df['Non/Syn'] = df['nonsynonymous_SNV'] / df['synonymous_SNV']
+        df.index.name = 'Gene'
+    elif summary_type == 'coordinate':
+        df.index.name = 'Coordinate'
+    else:
+        raise ValueError('{} not a valid summary_type!'.format(summary_type))
     return df
 
 def test():
@@ -140,17 +151,17 @@ def test():
     vcf = '119_annotated.hg19_multianno.vcf'
     vcf_filepath = os.path.join(data_directory, vcf)
 
-    #summary = build_gene_summary(vcf_filepath)
-    summary = build_position_summary(vcf_filepath)
+    #summary = summarize_vcf_by_gene(vcf_filepath)
+    summary = summarize_vcf_by_position(vcf_filepath)
     df = build_summary_table(summary)
     print(df.head())
 
 def parseArgs():
     """Parse command line arguments and return args dict"""
-    parser = arparse.ArgumentParser(description='Summarize annovar annotated vcfs')
+    parser = argparse.ArgumentParser(description='Summarize annovar annotated vcfs')
     parser.add_argument('-I', '--input', type=str, nargs=1, dest='input_file')
     parser.add_argument('-d', '--directory', type=str, nargs=1, dest='directory')
-    parser.add_argument('O', '--output', type=str, nargs=1, dest='output_file')
+    parser.add_argument('-O', '--output', type=str, nargs=1, dest='output_file')
     args = parser.parse_args()
 
     if None in (args.input_file, args.output_file):
@@ -165,12 +176,12 @@ def read_input_file(input_file, directory=None):
     files = []
     with open(input_file, 'r') as f:
         files = f.readlines()
-        files = [line.rstrip('\n') for line in lines]
+        files = [f.rstrip('\n') for f in files]
         if directory is not None:
             files = [os.path.join(directory, f) for f in files]
     return files
 
-def normal_behavior():
+def main():
     args = parseArgs()
     vcfs = read_input_file(args['input_file'], args['directory'])
    
@@ -178,17 +189,16 @@ def normal_behavior():
     gene_summary = summarize_by_gene(vcfs)
     gene_summary_filename = '{}_{}.csv'.format(args['output_file'], 
                                                 'GENE')
-    save_summary(gene_summary, gene_summary_filename)
+    gene_summary_table = build_summary_table(gene_summary, summary_type='gene')
+    gene_summary_table.to_csv(gene_summary_filename)
     
-    print('Building position based summary file')
-    position_summary = summarize_by_position(vcfs)
-    position_summary_filename = '{}_{}.csv'.format(args['output_file'], 
+    print('Building coordinate based summary file')
+    coordinate_summary = summarize_by_position(vcfs)
+    coordinate_summary_filename = '{}_{}.csv'.format(args['output_file'], 
                                                     'COORDINATE')
-    save_summary(position_summary, position_summary_filename)
+    coordinate_summary_table = build_summary_table(coordinate_summary, summary_type='coordinate') 
+    coordinate_summary_table.to_csv(coordinate_summary_filename)
     print('VCFs summarized!')
-
-def main():
-    test()
 
 if __name__ == '__main__':
     main()
