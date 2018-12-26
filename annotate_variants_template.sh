@@ -10,9 +10,8 @@
 #SBATCH --mail-user=_USER_@stanford.edu 
 #SBATCH --workdir=_WORKING_DIRECTORY_
 
-ml system singularity
 
-gatk_path=/home/groups/carilee/software/gatk4-latest.simg
+gatk_path=/scratch/groups/carilee/containers/gatk_latest.sif
 ref_assembly=/home/groups/carilee/refs/hg19/ucsc.hg19.fasta
 annotations_directory=/home/groups/carilee/refs/annovar-refs/humandb/
 
