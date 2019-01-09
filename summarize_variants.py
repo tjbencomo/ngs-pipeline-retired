@@ -82,6 +82,7 @@ def update_gene_entry(variant_summary, record, gene, variant_type):
         variant_summary[gene]['Position'] = []
         variant_summary[gene]['Mutation'] = []
         variant_summary[gene]['Sample'] = []
+        variant_summary[gene]['SCC_samples_filtered'] = []
     if variant_type in ('UTR3', 'UTR5'): 
         if variant_type in variant_summary[gene]:
             variant_summary[gene][variant_type] += 1
@@ -100,9 +101,14 @@ def update_gene_entry(variant_summary, record, gene, variant_type):
     sample_pair = []
     if len(record.samples) != 2:
         raise ValueError('Annotated VCF has more than 2 samples!')
-    variant_summary[gene]['Sample'].append('{}:{}'.format(
-                                                    record.samples[0].sample,
-                                                    record.samples[1].sample))
+    sample = '{}:{}'.format(record.samples[0].sample, record.samples[1].sample) 
+    variant_summary[gene]['Sample'].append(sample)
+    # Cari requested a column counting the number of SCCs with 
+    # nonsynonymous_SNV, stopgain, and splicing mutations
+    if (variant_type == 'exonic' and 
+         mutation_type in ('nonsynonymous_SNV', 'stopgain', 'splicing')):
+           variant_summary[gene]['SCC_samples_filtered'].append(sample)
+
     return variant_summary
                                                             
 def add_missing_gene_entries(variant_summary):
@@ -138,6 +144,7 @@ def build_summary_table(variant_summary, summary_type='coordinate'):
     df['NumberOfSCCs'] = df['Sample'].apply(set).apply(len)
     if summary_type == 'gene':
         df['Non/Syn'] = df['nonsynonymous_SNV'] / df['synonymous_SNV']
+        df['numberOfSCCs_filtered'] = df['SCC_samples_filtered'].apply(set).apply(len)
         df.index.name = 'Gene'
     elif summary_type == 'coordinate':
         df.index.name = 'Coordinate'
@@ -169,7 +176,7 @@ def parseArgs():
 
     return {'input_file' : ''.join(args.input_file),
             'output_file' : ''.join(args.output_file),
-            'directory' : args.directory}
+            'directory' : ''.join(args.directory)}
 
 def read_input_file(input_file, directory=None):
     """Parses filenames from input file and returns as list of files"""
