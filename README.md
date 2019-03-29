@@ -36,7 +36,16 @@ and replace `[data directory]` with the folder containing the `fastqc` reports. 
 [link](https://multiqc.info/docs/#using-multiqc-reports) provides an overview of how to use
 the report. 
 
+Its up to the user how to proceed once a QC problem has been identified. Depending
+on the quality of the sample, the user may decide to discard it all together. Although in the past
+trimming programs were often recommending, GATK 4.0 guidelines [recommend **against** trimming as
+it can hinder the BaseRecalibration preprocessing step](https://software.broadinstitute.org/gatk/documentation/tooldocs/4.0.0.0/picard_analysis_CollectBaseDistributionByCycle.php).
+Instead, BaseRecalibration can usually account
+for poor quality reads used by Mutect2. 
+
 ## Preprocessing
+`variant-discovery-pipeline` follows a modified version of the Broad's 
+[Best Practices Pipelines for Variant Discovery](https://software.broadinstitute.org/gatk/best-practices/workflow).
 
 
 ## Variant Calling
