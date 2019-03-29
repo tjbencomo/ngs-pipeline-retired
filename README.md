@@ -1,5 +1,32 @@
 # variant-discovery-pipeline
-**CURRENTLY A WORK IN PROGRESS**  
+**CURRENTLY A WORK IN PROGRESS**
+
+`variant-discovery-pipeline` is a pipeline for variant calling WES and WGS data. The Broad's GATK software is used
+for much of the preprocessing and variant calling. Annovar annotates the identified variants. The README documents
+all necessary steps to run variant calling on raw FASTQ data from quality control to variant annotation. In its current
+state, `variant-discovery-pipeline` only works on the Sherlock HPC cluster at Stanford. 
+
+1. [Quality Control](#quality-control)
+2. [Preprocessing](#preprocessing)
+3. [Variant Calling](#variant-calling)
+4. [Annotation](#annotation)
+5. [Analysis](#analysis)
+
+## Quality Control
+
+
+## Preprocessing
+
+
+## Variant Calling
+
+
+## Annotation
+
+
+## Analysis
+
+
 Modified implementation of the Broad's [Best Practices Pipelines for Variant Discovery](https://software.broadinstitute.org/gatk/best-practices/workflow) for use on Stanford's Sherlock Compute Cluster. The project consists of two pipelines: PreProcessing and VariantCalling. PreProcessing performs data preprocessing on an individual sample. VariantCalling performs Mutect2 variant calling for a normal/tumor pair of samples. 
 
 ## Details
