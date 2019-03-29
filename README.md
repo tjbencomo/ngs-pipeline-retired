@@ -13,7 +13,28 @@ state, `variant-discovery-pipeline` only works on the Sherlock HPC cluster at St
 5. [Analysis](#analysis)
 
 ## Quality Control
+Before preprocessing can begin, the raw FASTQ files should be evaluated for quality control (QC).
+Sequencing can introduce artefacts and other bias that can affect variant calling and downstream
+analysis. It is vital we are aware of any potential defects early on. We use two tools, [fastqc](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) and [multiqc](https://multiqc.info/)
+to produce QC reports for FASTQ data. 
 
+First, use `fastqc` to generate individual QC reports for each FASTQ file.
+```
+fastqc [input fastq]
+```
+evaluates a single FASTQ file. If all the FASTQ files are stored in a single directory type
+```
+fastqc *.fastq.gz
+```
+This will produce reports for each individual FASTQ file. Once these reports have been generated,
+`multiqc` can summarize all the reports. Type
+```
+multiqc [data directory]
+```
+and replace `[data directory]` with the folder containing the `fastqc` reports. The file
+`multiqc_report.html` will contain the summarized report info. This 
+[link](https://multiqc.info/docs/#using-multiqc-reports) provides an overview of how to use
+the report. 
 
 ## Preprocessing
 
