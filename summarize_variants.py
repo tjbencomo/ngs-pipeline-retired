@@ -144,7 +144,7 @@ def build_summary_table(variant_summary, summary_type='coordinate'):
     df['NumberOfSCCs'] = df['Sample'].apply(set).apply(len)
     if summary_type == 'gene':
         df['Non/Syn'] = df['nonsynonymous_SNV'] / df['synonymous_SNV']
-        df['numberOfSCCs_filtered'] = df['SCC_samples_filtered'].apply(set).apply(len)
+        df['NumberOfSCCs_filtered'] = df['SCC_samples_filtered'].apply(set).apply(len)
         df.index.name = 'Gene'
     elif summary_type == 'coordinate':
         df.index.name = 'Coordinate'
@@ -197,6 +197,7 @@ def main():
     gene_summary_filename = '{}_{}.csv'.format(args['output_file'], 
                                                 'GENE')
     gene_summary_table = build_summary_table(gene_summary, summary_type='gene')
+    #print(len(set(gene_summary_table.loc['COL11A1', 'SCC_samples_filtered'])))
     gene_summary_table.to_csv(gene_summary_filename)
     
     print('Building coordinate based summary file')
