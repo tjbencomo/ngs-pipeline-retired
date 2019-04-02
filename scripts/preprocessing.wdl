@@ -21,10 +21,7 @@ workflow PreProcessingForVariantDiscovery {
     Array[File] known_indels_sites_VCFs
     Array[File] known_indels_sites_indices
 
-    String gatk_path
-
     String base_file_name = sample_name + "." + ref_name
-    String output_directory
 
     String read_group
     String platform_unit
@@ -41,8 +38,6 @@ workflow PreProcessingForVariantDiscovery {
             platform_unit = platform_unit,
             platform = platform,
             output_file_name = base_file_name + ".unaligned.bam",
-            gatk_path = gatk_path,
-            output_directory = output_directory
     }
 
     call SamToFastqAndBwaMem {
@@ -50,11 +45,9 @@ workflow PreProcessingForVariantDiscovery {
             input_bam = FastqToBam.output_bam,
             bwa_commandline = bwa_commandline,
             output_bam_name = base_file_name + ".unmerged",
-            output_directory = output_directory,
             ref_fasta = ref_fasta,
             ref_fasta_index = ref_fasta_index,
             ref_dict = ref_dict,
-            gatk_path = gatk_path
     }
 
     call MergeBamAlignment {
@@ -64,11 +57,9 @@ workflow PreProcessingForVariantDiscovery {
             bwa_version = GetBwaVersion.version,
             aligned_bam = SamToFastqAndBwaMem.output_bam,
             output_bam_name = base_file_name + ".aligned.unsorted",
-            output_directory = output_directory,
             ref_fasta = ref_fasta,
             ref_fasta_index = ref_fasta_index,
             ref_dict = ref_dict,
-            gatk_path = gatk_path
     }
 
     call MarkDuplicates {
@@ -76,19 +67,15 @@ workflow PreProcessingForVariantDiscovery {
             input_bam = MergeBamAlignment.output_bam,
             output_bam_name = base_file_name + ".aligned.unsorted.duplicates_marked",
             metrics_filename = base_file_name + ".duplicate_metrics",
-            output_directory = output_directory,
-            gatk_path = gatk_path
     }
 
     call SortAndFixTags {
         input:
             input_bam = MarkDuplicates.output_bam,
             output_bam_name = base_file_name + ".aligned.duplicate_marked.sorted",
-            output_directory = output_directory,
             ref_dict = ref_dict,
             ref_fasta = ref_fasta,
             ref_fasta_index = ref_fasta_index,
-            gatk_path = gatk_path
     }
 
     call CreateSequenceGroupingTSV {
@@ -110,7 +97,6 @@ workflow PreProcessingForVariantDiscovery {
                 ref_dict = ref_dict,
                 ref_fasta = ref_fasta,
                 ref_fasta_index = ref_fasta_index,
-                gatk_path = gatk_path,
         }
     }
 
@@ -118,8 +104,6 @@ workflow PreProcessingForVariantDiscovery {
         input:
             input_bqsr_reports = BaseRecalibrator.recalibration_report,
             output_report_file_name = base_file_name + ".recal_data.csv",
-            gatk_path = gatk_path,
-            output_directory = output_directory
 
     }
 
@@ -134,7 +118,6 @@ workflow PreProcessingForVariantDiscovery {
                 ref_dict = ref_dict,
                 ref_fasta = ref_fasta,
                 ref_fasta_index = ref_fasta_index,
-                gatk_path = gatk_path,
         }
     }
 
@@ -142,8 +125,6 @@ workflow PreProcessingForVariantDiscovery {
         input:
             input_bams = ApplyBQSR.recalibrated_bam,
             output_bam_base_name = base_file_name,
-            output_directory = output_directory,
-            gatk_path = gatk_path
     }
 
     output {
@@ -156,16 +137,15 @@ workflow PreProcessingForVariantDiscovery {
 }
 
 task GetBwaVersion {
-    command <<<
+    command {
         module load biology bwa
         bwa 2>&1 | \
         grep -e '^Version' | \
         sed 's/Version: //'
-    >>>
+    }
     runtime {
-        runtime_minutes: "20"
-        requested_memory_mb_per_core: "1000"
-        cpus: "1"
+        runtime_minutes: "5"
+        memory: 1000
     }
     output {
         String version = read_string(stdout())
@@ -177,36 +157,30 @@ task FastqToBam {
     File fastq_2
     
     String output_file_name
-    String output_directory
 
     String sample_name
     String read_group
     String platform_unit
     String platform
 
-    String gatk_path
 
-    command <<<
-        module load system singularity
-        echo ${fastq_1}
-        echo ${fastq_2}
-        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk FastqToSam \
+    command {
+        module load biology gatk
+        gatk FastqToSam \
             --FASTQ=${fastq_1} \
             --FASTQ2=${fastq_2} \
-            --OUTPUT=${output_directory}${output_file_name} \
+            --OUTPUT=${output_file_name} \
             --PLATFORM_UNIT="${platform_unit}" \
             --PLATFORM="${platform}" \
             --SAMPLE_NAME=${sample_name} \
             -RG="${read_group}"
-            
-    >>>
+    }
     runtime {
         runtime_minutes: "180"
-        requested_memory_mb_per_core: "8000"
-        cpus: 1
+        memory: 8000
     }
     output {
-        File output_bam = output_directory + output_file_name
+        File output_bam = output_file_name
     }
 }
 
@@ -216,7 +190,6 @@ task SamToFastqAndBwaMem {
     File input_bam
     String bwa_commandline
     String output_bam_name
-    String output_directory
     File ref_fasta
     File ref_fasta_index
     File ref_dict
@@ -227,36 +200,32 @@ task SamToFastqAndBwaMem {
     File ref_pac
     File ref_sa
 
-    String gatk_path
 
-    command <<<
+
+    command {
         set -o pipefail
         set -e
 
-        module load system singularity
         module load biology bwa
         module load biology samtools
-
-        echo ${input_bam}
-
-        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk SamToFastq \
-            --INPUT=${input_bam} \
-            --FASTQ=/dev/stdout \
-            --INTERLEAVE=true \
-            --INCLUDE_NON_PF_READS=true \
-        | \
-        bwa ${bwa_commandline} ${ref_fasta} /dev/stdin - 2> >(tee ${output_directory}${output_bam_name}.bwa.stderr.log >&2) \
-        | \
-        samtools view -1 - > ${output_directory}${output_bam_name}.bam        
-    >>>
+        module load biology gatk
+        gatk SamToFastq \
+          --INPUT=${input_bam} \
+          --FASTQ=/dev/stdout \
+          --INTERLEAVE=true \
+          --INCLUDE_NON_PF_READS=true \
+          | \
+          bwa ${bwa_commandline} ${ref_fasta} /dev/stdin - 2> >(tee ${output_bam_name}.bwa.stderr.log >&2) \
+          | \
+          samtools view -1 - > ${output_bam_name}.bam        
+    }
     runtime {
-        runtime_minutes: "300"
-        requested_memory_mb_per_core: "8000"
-        cpus: "4"
+        runtime_minutes: "180"
+        memory: 32000
     }
     output {
-        File output_bam = "${output_directory}${output_bam_name}.bam"
-        File bwa_stderr_log = "${output_directory}${output_bam_name}.bwa.stderr.log"
+        File output_bam = "${output_bam_name}.bam"
+        File bwa_stderr_log = "${output_bam_name}.bwa.stderr.log"
     }
 }
 
@@ -266,24 +235,20 @@ task MergeBamAlignment {
     String bwa_version
     File aligned_bam
     String output_bam_name
-    String output_directory
     File ref_fasta
     File ref_fasta_index
     File ref_dict
 
-    String gatk_path
 
-    command <<<
-        module load system singularity
-        echo ${aligned_bam}
-        echo ${unaligned_bam}
-        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk MergeBamAlignment \
+    command {
+        module load biology gatk
+        gatk MergeBamAlignment \
             --VALIDATION_STRINGENCY SILENT \
             --EXPECTED_ORIENTATIONS FR \
             --ATTRIBUTES_TO_RETAIN X0 \
             --ALIGNED_BAM ${aligned_bam} \
             --UNMAPPED_BAM ${unaligned_bam} \
-            --OUTPUT ${output_directory}${output_bam_name}.bam \
+            --OUTPUT ${output_bam_name}.bam \
             --REFERENCE_SEQUENCE ${ref_fasta} \
             --PAIRED_RUN true \
             --SORT_ORDER "unsorted" \
@@ -301,14 +266,13 @@ task MergeBamAlignment {
             --UNMAPPED_READ_STRATEGY COPY_TO_TAG \
             --ALIGNER_PROPER_PAIR_FLAGS true \
             --UNMAP_CONTAMINANT_READS true
-    >>>
+    }
     runtime {
         runtime_minutes: "180"
-        requested_memory_mb_per_core: "16000"
-        cpus: 1
+        memory: 24000
     }
     output {
-        File output_bam = "${output_directory}${output_bam_name}.bam"
+        File output_bam = "${output_bam_name}.bam"
     }
 }
 
@@ -316,74 +280,68 @@ task MarkDuplicates {
     File input_bam
     String output_bam_name
     String metrics_filename
-    String output_directory
 
-    String gatk_path
 
-    command <<<
-        module load system singularity
-        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk MarkDuplicates \
+    command {
+        module load biology gatk
+        gatk MarkDuplicates \
             --INPUT ${input_bam} \
-            --OUTPUT ${output_directory}${output_bam_name}.bam \
-            --METRICS_FILE ${output_directory}${metrics_filename} \
+            --OUTPUT ${output_bam_name}.bam \
+            --METRICS_FILE ${metrics_filename} \
             --VALIDATION_STRINGENCY SILENT \
             --OPTICAL_DUPLICATE_PIXEL_DISTANCE 100 \
             --ASSUME_SORT_ORDER "queryname" \
             --CREATE_MD5_FILE true
-    >>>
+    }
     runtime {
-        runtime_minutes: "600"
-        requested_memory_mb_per_core: "16000"
-        cpus: "1"
+        runtime_minutes: "180"
+        memory: 48000
     }
     output {
-        File output_bam = "${output_directory}${output_bam_name}.bam"
-        File duplicate_metrics = "${output_directory}${metrics_filename}"
+        File output_bam = "${output_bam_name}.bam"
+        File duplicate_metrics = "${metrics_filename}"
     }
 }
 
 task SortAndFixTags {
     File input_bam
     String output_bam_name
-    String output_directory
     File ref_dict
     File ref_fasta
     File ref_fasta_index
-    String gatk_path
     
-    command <<<
+    command {
         set -o pipefail
-        module load singularity
-        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk SortSam \
+        module load biology gatk
+        gatk SortSam \
             --INPUT ${input_bam} \
             --OUTPUT /dev/stdout \
             --SORT_ORDER "coordinate" \
             --CREATE_INDEX false \
             --CREATE_MD5_FILE false \
         | \
-        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk SetNmMdAndUqTags \
+        gatk SetNmMdAndUqTags \
             --INPUT /dev/stdin \
-            --OUTPUT ${output_directory}${output_bam_name}.bam \
+            --OUTPUT ${output_bam_name}.bam \
             --CREATE_INDEX true \
             --CREATE_MD5_FILE true \
             --REFERENCE_SEQUENCE ${ref_fasta}
-    >>>
+    }
     runtime {
-        runtime_minutes: "600"
-        requested_memory_mb_per_core: "16000"
-        cpus: "1"
+        runtime_minutes: "360"
+        memory: 24000
     }
     output {
-        File output_bam = "${output_directory}${output_bam_name}.bam"
-        File output_bam_index = "${output_directory}${output_bam_name}.bai"
-        File output_bam_md5 = "${output_directory}${output_bam_name}.bam.md5"
+        File output_bam = "${output_bam_name}.bam"
+        File output_bam_index = "${output_bam_name}.bai"
+        File output_bam_md5 = "${output_bam_name}.bam.md5"
     }
 }
 
 task CreateSequenceGroupingTSV {
     File ref_dict
 
-    command <<<
+    command {
         python <<CODE
         with open("${ref_dict}", "r") as ref_dict_file:
             sequence_tuple_list = []
@@ -418,11 +376,10 @@ task CreateSequenceGroupingTSV {
                 tsv_file_with_unmapped.write(tsv_string)
                 tsv_file_with_unmapped.close()
         CODE
-    >>>
+    }
     runtime {
         runtime_minutes: "20"
-        requested_memory_mb_per_core: "1000"
-        cpus: "1"
+        memory: 1000
     }
     output {
         Array[Array[String]] sequence_grouping = read_tsv("sequence_grouping.txt")
@@ -443,11 +400,10 @@ task BaseRecalibrator {
     File ref_fasta
     File ref_fasta_index
 
-    String gatk_path
 
-    command <<<
-        module load singularity
-        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk BaseRecalibrator \
+    command {
+        module load biology gatk
+        gatk BaseRecalibrator \
             -R ${ref_fasta} \
             -I ${input_bam} \
             --use-original-qualities \
@@ -455,11 +411,10 @@ task BaseRecalibrator {
             --known-sites ${dbSNP_vcf} \
             --known-sites ${sep=" --known-sites " known_indels_sites_VCFs} \
             -L ${sep=" -L " sequence_group_interval}
-    >>>
+    }
     runtime {
-        runtime_minutes: "180"
-        requested_memory_mb_per_core: "8000"
-        cpus: "1"
+        runtime_minutes: "120"
+        memory: 8000
     }
     output {
         File recalibration_report = "${recalibration_report_filename}"
@@ -470,23 +425,20 @@ task GatherBqsrReports {
     Array[File] input_bqsr_reports
 
     String output_report_file_name
-    String output_directory
     
-    String gatk_path
 
-    command <<<
-        module load singularity
-        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk GatherBQSRReports \
+    command {
+        module load biology gatk
+        gatk GatherBQSRReports \
             -I ${sep=' -I ' input_bqsr_reports} \
-            -O ${output_directory}${output_report_file_name}
-    >>>
+            -O ${output_report_file_name}
+    }
     runtime {
-        runtime_minutes: "240"
-        requested_memory_mb_per_core: "16000"
-        cpus: "1"
+        runtime_minutes: "120"
+        memory: 8000
     }
     output {
-        File output_bqsr_report = "${output_directory}${output_report_file_name}"
+        File output_bqsr_report = "${output_report_file_name}"
     }
 }
 
@@ -504,11 +456,10 @@ task ApplyBQSR {
     File ref_fasta
     File ref_fasta_index
 
-    String gatk_path
 
-    command <<<
-        module load singularity
-        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk ApplyBQSR \
+    command {
+        module load biology gatk
+        gatk ApplyBQSR \
             -R ${ref_fasta} \
             -I ${input_bam} \
             -O ${output_bam_base_name}.bam \
@@ -518,11 +469,10 @@ task ApplyBQSR {
             --add-output-sam-program-record \
             --create-output-bam-md5 \
             --use-original-qualities
-    >>>
+    }
     runtime {
-        runtime_minutes: "180"
-        requested_memory_mb_per_core: "8000"
-        cpus: "1"
+        runtime_minutes: "120"
+        memory: 8000
     }
     output {
         File recalibrated_bam = "${output_bam_base_name}.bam"
@@ -532,26 +482,23 @@ task ApplyBQSR {
 task GatherBamFiles {
     Array[File] input_bams
     String output_bam_base_name
-    String output_directory
-    String gatk_path
 
-    command <<<
-        module load singularity
-        singularity exec --bind /regal/groups/carilee:/regal/groups/carilee ${gatk_path} gatk GatherBamFiles \
+    command {
+        module load biology gatk
+        gatk GatherBamFiles \
             --INPUT ${sep=' --INPUT ' input_bams} \
-            --OUTPUT ${output_directory}${output_bam_base_name}.bam \
+            --OUTPUT ${output_bam_base_name}.bam \
             --CREATE_INDEX true \
             --CREATE_MD5_FILE true
-    >>>
+    }
     runtime {
-        runtime_minutes: "240"
-        requested_memory_mb_per_core: "16000"
-        cpus: "1"
+        runtime_minutes: "120"
+        memory: 8000
     }
     output {
-        File output_bam = "${output_directory}${output_bam_base_name}.bam"
-        File output_bam_index = "${output_directory}${output_bam_base_name}.bai"
-        File output_bam_md5 = "${output_directory}${output_bam_base_name}.bam.md5"
+        File output_bam = "${output_bam_base_name}.bam"
+        File output_bam_index = "${output_bam_base_name}.bai"
+        File output_bam_md5 = "${output_bam_base_name}.bam.md5"
     }
 }
 
