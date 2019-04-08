@@ -1,6 +1,7 @@
 workflow PreProcessingForVariantDiscovery {
     String sample_name
     String ref_name
+    String output_directory
 
     File input_fastq_1
     File input_fastq_2
@@ -127,12 +128,14 @@ workflow PreProcessingForVariantDiscovery {
             output_bam_base_name = base_file_name,
     }
 
-    output {
-        File duplication_metrics = MarkDuplicates.duplicate_metrics
-        File bqsr_report = GatherBqsrReports.output_bqsr_report
-        File analysis_ready_bam = GatherBamFiles.output_bam
-        File analysis_ready_bam_index = GatherBamFiles.output_bam_index
-        File analysis_ready_bam_md5 = GatherBamFiles.output_bam_md5
+    call CopyOutputs {
+      input:
+        output_directory = output_directory,
+        duplication_metrics = MarkDuplicates.duplicate_metrics,
+        bqsr_report = GatherBqsrReports.output_bqsr_report,
+        analysis_ready_bam = GatherBamFiles.output_bam,
+        analysis_ready_bam_index = GatherBamFiles.output_bam_index,
+        analysis_ready_bam_md5 = GatherBamFiles.output_bam_md5
     }
 }
 
@@ -502,7 +505,28 @@ task GatherBamFiles {
     }
 }
 
+task CopyOutputs {
+  String output_directory
+  File duplication_metrics 
+  File bqsr_report 
+  File analysis_ready_bam 
+  File analysis_ready_bam_index 
+  File analysis_ready_bam_md5 
+
+  command {
+    mkdir ${output_directory}
+    cp ${duplication_metrics} ${output_directory}
+    cp ${bqsr_report} ${output_directory}
+    cp ${analysis_ready_bam} ${output_directory}
+    cp ${analysis_ready_bam_index} ${output_directory}
+    cp ${analysis_ready_bam_md5} ${output_directory}
+  }
+
+  runtime {
+    runtime_minutes: "240"
+    memory: 16000
+  }
+}
+
 # TODO
 # 2) Fix FastqToSam parameter abbreviation naming
-# 3) Look at AnalyzeCovariates on full sample run
-# 4) Add copy task to move over necessary files - https://github.com/broadinstitute/cromwell/issues/1641
