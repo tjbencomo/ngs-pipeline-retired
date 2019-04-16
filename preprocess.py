@@ -208,26 +208,16 @@ def create_job(sample, inputs_filepath, cromwell_path, workdir, output_dir, emai
                                                                             options_filepath))
         return job_filepath
 
-# def launch_pipeline(row, refs, workdir):
 def launch_pipeline(row, refs, workdir):
-    # Create json input file and save
-    # print(row)
-    # print()
     sample_name = row['SamplePrefix'] + row['Sample']
-    print(sample_name)
     read_group = row['ID']
     platform = 'ILLUMINA'
     json_filepath  = create_json(sample_name, row['FASTQ1'], row['FASTQ2'], 
                                     row['OutputDirectory'], read_group, platform, refs)
-    # # Run sbatch
     job_filepath = create_job(sample_name, json_filepath, refs['cromwell_jar'],
                                 workdir, row['OutputDirectory'], refs['email'])
-    # print("Submitting job script for {}".format(sample_name))
-    # subprocess.run(['sbatch', job_filepath])
-    # print("Job submitted for {}".format(sample_name))
-
-def test(row):
-    print(row)
+    subprocess.run(['sbatch', job_filepath])
+    print("Job submitted for {}".format(sample_name))
 
 def main():
     args = parse_args()
@@ -237,7 +227,7 @@ def main():
     if check_requirements(df) is False:
         raise ValueError("Input file incorrect, check to make sure nothing is missing!")
     df['ID'] = extract_read_info(df['FASTQ1'])
-    df.apply(lambda x: launch_pipeline(x, refs, args['workdir']), axis=1)
+    df.apply(launch_pipeline, args=(refs, args['workdir']), axis=1)
 
 if __name__ == '__main__':
     main()
