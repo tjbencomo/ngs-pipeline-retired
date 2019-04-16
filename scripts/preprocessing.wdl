@@ -25,7 +25,7 @@ workflow PreProcessingForVariantDiscovery {
     String base_file_name = sample_name + "." + ref_name
 
     String read_group
-    String platform_unit
+    #String platform_unit
     String platform
 
     call GetBwaVersion {}
@@ -36,7 +36,7 @@ workflow PreProcessingForVariantDiscovery {
             fastq_2 = input_fastq_2,
             sample_name = sample_name,
             read_group = read_group,
-            platform_unit = platform_unit,
+            #platform_unit = platform_unit,
             platform = platform,
             output_file_name = base_file_name + ".unaligned.bam",
     }
@@ -163,7 +163,7 @@ task FastqToBam {
 
     String sample_name
     String read_group
-    String platform_unit
+    #String platform_unit
     String platform
 
 
@@ -173,7 +173,6 @@ task FastqToBam {
             --FASTQ=${fastq_1} \
             --FASTQ2=${fastq_2} \
             --OUTPUT=${output_file_name} \
-            --PLATFORM_UNIT="${platform_unit}" \
             --PLATFORM="${platform}" \
             --SAMPLE_NAME=${sample_name} \
             -RG="${read_group}"
