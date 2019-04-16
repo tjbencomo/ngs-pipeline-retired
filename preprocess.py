@@ -22,6 +22,7 @@ import json
 import re
 import argparse
 import csv
+import gzip
 import subprocess
 import pandas as pd
 
@@ -48,8 +49,8 @@ def parse_args():
     parser.add_argument('pipeline_dir', metavar='workdir', type=str, nargs=1,
                             help='where the pipeline will save execution logs')
     args = parser.parse_args()
-    return {'input': args.input_file[0], 
-            'refs' : args.input_file[0], 
+    return {'input': args.samples[0], 
+            'refs' : args.ref_files[0], 
             'workdir' : args.pipeline_dir[0] }
 
 def verify_workdir(workdir):
@@ -69,18 +70,22 @@ def read_input(filepath):
     else:
         df = pd.read_csv(filepath)
     
-    df.loc[(df['SamplePrefix'].isnull()) & (df['Type'] == 'Tumor'), 'SamplePrfix'] = 'T'
+    df.loc[(df['SamplePrefix'].isnull()) & (df['Type'] == 'Tumor'), 'SamplePrefix'] = 'T'
     df.loc[(df['SamplePrefix'].isnull()) & (df['Type'] == 'Normal'), 'SamplePrefix'] = 'CTR'
+    df['Sample'] = df['Sample'].astype(str)
     return df
 
 def check_refs(refs):
     '''
     Ensure all the required refs are in the refs dict
     '''
-    keys = ['known_indels_sites_indices', 'dbSNP_vcf', 'dvSNP_vcf_index',
+    keys = ['known_indels_sites_indices', 'dbSNP_vcf', 'dbSNP_vcf_index',
             'ref_dict', 'ref_fasta_index', 'known_indels_sites_VCFs', 
             'ref_name', 'ref_fasta', 'ref_sa', 'ref_amb', 'ref_bwt', 
             'ref_ann', 'ref_pac', 'cromwell_jar', 'email']
+    missing = set(keys) - set(refs.keys())
+    if len(missing) > 0:
+        print(missing)
     return set(refs.keys()) == set(keys)
 
 def read_references(filepath):
@@ -113,17 +118,35 @@ def check_requirements(df):
     '''
     return df.isnull().sum() == 0
 
-def extract_read_info(fastq_files):
-    read_tags = {'ID' : []}
-    for filepath in fastq_files:
-        with open(filepath, 'r') as f:
-            '''@<flowcell ID>:<lane>:<tile>:<x-pos>:<y-pos>'''
-            x = re.split(':|#', f.read_line())
-            flowcell = x[0].strip('@')
-            lane = x[1]
-            read_tags['ID'].append('{}.{}'.format(flowcell, lane))
+def read_ID_fastq(filepath):
+    with open(filepath, 'r') as f:
+        '''@<flowcell ID>:<lane>:<tile>:<x-pos>:<y-pos>'''
+        line = f.readline().rstrip('\n')
+        line = re.split(':|#', line)
+        flowcell = line[0].strip('@')
+        lane = line[1]
+        return '{}.{}'.format(flowcell, lane)
+    raise ValueError("ID Extraction failed for {}".format(filepath))
 
-    return pd.Series(read_tags)
+def read_ID_fastqgz(filepath):
+    with gzip.open(filepath, 'rb') as f:
+        '''@<flowcell ID>:<lane>:<tile>:<x-pos>:<y-pos>'''
+        line = f.readline().decode('utf-8').rstrip('\n')
+        line = re.split(':|#', line)
+        flowcell = line[0].strip('@')
+        lane = line[1]
+        return '{}.{}'.format(flowcell, lane)
+    raise ValueError("ID Extraction failed for {}".format(filepath))
+
+def extract_read_info(fastq_files):
+    read_IDs = []
+    for filepath in fastq_files:
+        if filepath.endswith('.gz'):
+            ID = read_ID_fastqgz(filepath)
+        else:
+            ID = read_ID_fastq(filepath)
+        read_IDs.append(ID)
+    return read_IDs
 
 def create_json(sample, fastq1, fastq2, output_dir, read_group, platform, refs):
     bwa = "mem -K 100000000 -p -v 3 -t $SLURM_CPUS_ON_NODE -Y"
@@ -159,7 +182,7 @@ def create_json(sample, fastq1, fastq2, output_dir, read_group, platform, refs):
     return filepath
 
 def create_job(sample, inputs_filepath, cromwell_path, workdir, output_dir, email):
-    job_filepath = os.path.join(output_dir, '{}_preprocess.sh')
+    job_filepath = os.path.join(output_dir, '{}_preprocess.sh'.format(sample))
     with open(job_filepath, 'w') as f:
         f.write("#!/bin/bash\n")
         f.write('#SBATCH --job-name=variant-discovery-pipeline\n')
@@ -185,31 +208,36 @@ def create_job(sample, inputs_filepath, cromwell_path, workdir, output_dir, emai
                                                                             options_filepath))
         return job_filepath
 
-
-
+# def launch_pipeline(row, refs, workdir):
 def launch_pipeline(row, refs, workdir):
     # Create json input file and save
+    # print(row)
+    # print()
     sample_name = row['SamplePrefix'] + row['Sample']
+    print(sample_name)
     read_group = row['ID']
     platform = 'ILLUMINA'
     json_filepath  = create_json(sample_name, row['FASTQ1'], row['FASTQ2'], 
-                                    row['OutputDir'], read_group, platform, refs)
-    # Run sbatch
-    job_filepath = create_job(sample_name, refs['cromwell_jar'], 
-                                workdir, row['OutputDir'])
-    print("Submitting job script for {}".format(sample_name))
-    subprocess.run(['sbatch', job_filepath])
-    print("Job submitted for {}".format(sample_name))
+                                    row['OutputDirectory'], read_group, platform, refs)
+    # # Run sbatch
+    job_filepath = create_job(sample_name, json_filepath, refs['cromwell_jar'],
+                                workdir, row['OutputDirectory'], refs['email'])
+    # print("Submitting job script for {}".format(sample_name))
+    # subprocess.run(['sbatch', job_filepath])
+    # print("Job submitted for {}".format(sample_name))
 
+def test(row):
+    print(row)
 
 def main():
     args = parse_args()
     verify_workdir(args['workdir'])
     df = read_input(args['input'])
+    refs = read_references(args['refs'])
     if check_requirements(df) is False:
         raise ValueError("Input file incorrect, check to make sure nothing is missing!")
-    df['ID'] = extract_read_info(df['FASTQ1']) # assume FASTQ1/2 have same info
-    df.apply(launch_pipeline, args=(refs, args['workdir']))
+    df['ID'] = extract_read_info(df['FASTQ1'])
+    df.apply(lambda x: launch_pipeline(x, refs, args['workdir']), axis=1)
 
 if __name__ == '__main__':
     main()
