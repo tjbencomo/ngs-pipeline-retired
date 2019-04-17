@@ -46,7 +46,38 @@ for poor quality reads used by Mutect2.
 ## Preprocessing
 `variant-discovery-pipeline` follows a modified version of the Broad's 
 [Best Practices Pipelines for Variant Discovery](https://software.broadinstitute.org/gatk/best-practices/workflow).
+Not all scatter operations are performed to save time waiting on excess SLURM jobs. 
 
+Preprocessing requires 2 items from the user. First, the user must provide an inputs file describing each sample, its FASTQ files,
+Library ID, and the directory where the preprocessed files should be saved. This info should be saved in a `.csv` or `.xlsx` file. 
+A reference file must also be specified that tells `variant-discovery-pipeline` where to look for items like the reference genome fasta,
+`cromwell` jar, and email address to notify the user of pipeline failure. Reference genome files can be downloaded from the [Broad's
+Resource Bundle](https://software.broadinstitute.org/gatk/download/bundle) over FTP. Cromwell executables can be found on its 
+[Github](https://github.com/broadinstitute/cromwell/releases).
+
+```
+Input File Columns (.csv or .xslx):
+  Sample
+  Type
+  FASTQ1
+  FASTQ2
+  OutputDirectory
+  Library
+  SamplePrefix (Optional but still need to include column even if it'll be left blank)
+  
+Reference File Columns (Must be .csv formatted):
+  Reference
+  Path
+```
+Use absolute paths for the reference files. See `preprocessing_references_template.csv` for a template file with all the required
+references you need to specify.
+To call the preprocessing pipeline, type
+```
+python preprocess.py [inputs.csv] [references.csv] [log_directory]
+```
+`[log_directory]` is the directory to store all the cromwell logs and intermediate files. Cromwell produces a lot of intermediate
+files and logs, so its best to specify this directory as somewhere with large storage volume (like `$SCRATCH`) and to delete often 
+once you no longer need the logs or intermediates. 
 
 ## Variant Calling
 
