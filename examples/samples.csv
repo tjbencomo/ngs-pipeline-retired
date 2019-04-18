@@ -1,0 +1,3 @@
+Sample,Type,FASTQ1,FASTQ2,OutputDirectory,SamplePrefix,Library
+501,Tumor,/scratch/users/tbencomo/pipeline_tests/T501_1.fastq.gz,/scratch/users/tbencomo/pipeline_tests/T501_2.fastq.gz,/scratch/users/tbencomo/pipeline_tests/outputs,T,Z8L1
+501,Normal,/scratch/users/tbencomo/pipeline_tests/CTR501_1.fastq.gz,/scratch/users/tbencomo/pipeline_tests/CTR501_2.fastq.gz,/scratch/users/tbencomo/pipeline_tests/outputs,CTR,Z8L1
