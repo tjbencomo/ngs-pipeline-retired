@@ -64,7 +64,6 @@ Input File Columns (.csv or .xslx):
   OutputDirectory
   Library
   SamplePrefix (Optional but still need to include column even if it'll be left blank)
-  
 Reference File Columns (Must be .csv formatted):
   Reference
   Path
