@@ -52,7 +52,7 @@ Preprocessing requires 2 items from the user. First, the user must provide an in
 Library ID, and the directory where the preprocessed files should be saved. This info should be saved in a `.csv` or `.xlsx` file. 
 A reference file must also be specified that tells `variant-discovery-pipeline` where to look for items like the reference genome fasta,
 `cromwell` jar, and email address to notify the user of pipeline failure. Reference genome files can be downloaded from the [Broad's
-Resource Bundle](https://software.broadinstitute.org/gatk/download/bundle) over FTP. Cromwell executables can be found on its 
+Resource Bundle](https://software.broadinstitute.org/gatk/download/bundle) over FTP. Cromwell executables can be found on 
 [Github](https://github.com/broadinstitute/cromwell/releases).
 
 ```
