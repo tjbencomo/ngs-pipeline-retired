@@ -16,7 +16,7 @@ workflow VariantCalling {
 
   String output_directory
 
-  call Mutect2 {
+   call Mutect2 {
     input:
       ref_fasta = ref_fasta,
       tumor_bam = tumor_bam,
@@ -53,13 +53,13 @@ workflow VariantCalling {
     input:
       output_directory = output_directory,
       filtered_vcf = FilterMutectCalls.filtered_vcf,
-      output_bam = Mutect2.bam
+      output_bam = Mutect2.bam,
       contamination_table = CalculateContamination.contamination_table,
       pileup_summary = GetPileupSummaries.pileup_summary
   }
 }
 
-call Mutect2 {
+task Mutect2 {
     File ref_fasta
     File tumor_bam
     File normal_bam
@@ -95,7 +95,7 @@ call Mutect2 {
     }
 }
 
-call GetPileupSummaries {
+task GetPileupSummaries {
   File tumor_bam
   File contamination_germline_resource
   String sample_name
@@ -138,7 +138,7 @@ task CalculateContamination {
   }
 }
 
-call FilterMutectCalls {
+task FilterMutectCalls {
   File unfiltered_vcf 
   File contamination_table 
   String sample_name 
@@ -160,7 +160,7 @@ call FilterMutectCalls {
   }
 }
 
-call CopyOutputs {
+task CopyOutputs {
   String output_directory 
   File filtered_vcf 
   File output_bam 
