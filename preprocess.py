@@ -41,6 +41,9 @@ import pandas as pd
 # 7) Info to pick up with variant-calling
 
 def parse_args():
+    '''
+    Gather arguments for program setup
+    '''
     parser = argparse.ArgumentParser(description = 'Initiate pipeline')
     parser.add_argument('samples', metavar='sample', type=str, nargs=1,
                             help='tabular file with sample info')
@@ -48,12 +51,18 @@ def parse_args():
                             help='csv file with reference filepaths')
     parser.add_argument('pipeline_dir', metavar='workdir', type=str, nargs=1,
                             help='where the pipeline will save execution logs')
+    parser.add_argument('-P', '--prep_inputs', action='store_true', 
+                            help='Generate input file for variant calling')
     args = parser.parse_args()
     return {'input': args.samples[0], 
             'refs' : args.ref_files[0], 
-            'workdir' : args.pipeline_dir[0] }
+            'workdir' : args.pipeline_dir[0],
+            'prep' : args.prep_inputs}
 
 def verify_workdir(workdir):
+    '''
+    Check that directory for cromwell logs is valid
+    '''
     if os.path.isdir(workdir) is False:
         print("{} does not exist. Creating new directory for logs...".format(workdir))
         try:
@@ -63,6 +72,9 @@ def verify_workdir(workdir):
             print("Creation of {} workdir failed. Input an existing folder".format(workdir))
 
 def read_input(filepath):
+    '''
+    Read user file with sample info. See README.md for format info
+    '''
     if os.path.isfile(filepath) is False:
         raise ValueError("{} does not exist!".format(filepath))
     if filepath.endswith('.xlsx'):
@@ -85,15 +97,18 @@ def check_refs(refs):
             'ref_ann', 'ref_pac', 'cromwell_jar', 'email']
     missing = set(keys) - set(refs.keys())
     if len(missing) > 0:
-        print(missing)
+        print('You are missing {} references: {}'.format(len(missing), missing))
     return set(refs.keys()) == set(keys)
 
 def read_references(filepath):
+    '''
+    Read references file from user
+    '''
     if os.path.isfile(filepath) is False:
         raise ValueError("{} does not exist!".format(filepath))
     refs = {}
     with open(filepath, newline='') as f:
-        f.readline() # chew through colnames
+        f.readline() # chew through header column
         reader = csv.reader(f)
         for row in reader:
             if row[0] not in refs:
@@ -119,6 +134,9 @@ def check_requirements(df):
     return df.isnull().sum() == 0
 
 def read_ID_fastq(filepath):
+    '''
+    Grab READ group for unzipped FASTQ file
+    '''
     with open(filepath, 'r') as f:
         '''@<flowcell ID>:<lane>:<tile>:<x-pos>:<y-pos>'''
         line = f.readline().rstrip('\n')
@@ -129,6 +147,9 @@ def read_ID_fastq(filepath):
     raise ValueError("ID Extraction failed for {}".format(filepath))
 
 def read_ID_fastqgz(filepath):
+    '''
+    Grab READ group for gzipped FASTQ file
+    '''
     with gzip.open(filepath, 'rb') as f:
         '''@<flowcell ID>:<lane>:<tile>:<x-pos>:<y-pos>'''
         line = f.readline().decode('utf-8').rstrip('\n')
@@ -139,6 +160,11 @@ def read_ID_fastqgz(filepath):
     raise ValueError("ID Extraction failed for {}".format(filepath))
 
 def extract_read_info(fastq_files):
+    '''
+    Extract read group info from FASTQ file to put in sample info
+    Only grabs first read group in FASTQ file, so ALL read IDs must
+    be the same in a single FASTQ file
+    '''
     read_IDs = []
     for filepath in fastq_files:
         if filepath.endswith('.gz'):
@@ -149,6 +175,9 @@ def extract_read_info(fastq_files):
     return read_IDs
 
 def create_json(sample, fastq1, fastq2, output_dir, read_group, platform, refs):
+    '''
+    Create input json for preprocess.wdl
+    '''
     bwa = "mem -K 100000000 -p -v 3 -t $SLURM_CPUS_ON_NODE -Y"
     compression = 5
     inputs = {
@@ -182,6 +211,9 @@ def create_json(sample, fastq1, fastq2, output_dir, read_group, platform, refs):
     return filepath
 
 def create_job(sample, inputs_filepath, cromwell_path, workdir, output_dir, email):
+    '''
+    Create bash script for cromwell launch of preprocessing.wdl
+    '''
     job_filepath = os.path.join(output_dir, '{}_preprocess.sh'.format(sample))
     with open(job_filepath, 'w') as f:
         f.write("#!/bin/bash\n")
@@ -209,6 +241,9 @@ def create_job(sample, inputs_filepath, cromwell_path, workdir, output_dir, emai
         return job_filepath
 
 def launch_pipeline(row, refs, workdir):
+    '''
+    Launch cromwell jobs for samples
+    '''
     sample_name = row['SamplePrefix'] + row['Sample']
     read_group = row['ID']
     platform = 'ILLUMINA'
@@ -219,6 +254,20 @@ def launch_pipeline(row, refs, workdir):
     subprocess.run(['sbatch', job_filepath])
     print("Job submitted for {}".format(sample_name))
 
+def prepare_calling_inputs(df, refs):
+    '''
+    Generate input file for the variant calling pipeline from sample inputs
+    '''
+    df['analysis_bam'] = df['SamplePrefix'] + df['Sample'] + '.' + refs['ref_name'] + '.bam'
+    call_inputs = df.pivot(index='Sample', columns='Type', values='analysis_bam')
+    call_inputs = call_inputs.rename(columns = {'Normal' : 'NormalBAM', 'Tumor' : 'TumorBAM'})
+    call_inputs['NormalSample'] = call_inputs['NormalBAM'].str.split('.').str[0]
+    call_inputs['TumorSample'] = call_inputs['TumorBAM'].str.split('.').str[0]
+    call_inputs = call_inputs.reset_index()
+    del call_inputs.columns.name
+    call_inputs = pd.merge(call_inputs, df[['Sample', 'OutputDirectory']].drop_duplicates(), how='left')
+    return df
+
 def main():
     args = parse_args()
     verify_workdir(args['workdir'])
@@ -228,6 +277,11 @@ def main():
         raise ValueError("Input file incorrect, check to make sure nothing is missing!")
     df['ID'] = extract_read_info(df['FASTQ1'])
     df.apply(launch_pipeline, args=(refs, args['workdir']), axis=1)
+    if args['prep']:
+        prepare_calling_inputs(df, refs)
+        call_inputs = prepare_calling_inputs(df, refs)
+        call_inputs.to_csv(index=False)
+
 
 if __name__ == '__main__':
     main()
