@@ -72,11 +72,11 @@ Use absolute paths for the reference files. See `preprocessing_references_templa
 references you need to specify.
 To call the preprocessing pipeline, type
 ```
-python preprocess.py [inputs.csv] [references.csv] [log_directory]
+python preprocess.py [-P] [inputs.csv] [references.csv] [log_directory]
 ```
 `[log_directory]` is the directory to store all the cromwell logs and intermediate files. Cromwell produces a lot of intermediate
 files and logs, so its best to specify this directory as somewhere with large storage volume (like `$SCRATCH`) and to delete often 
-once you no longer need the logs or intermediates. 
+once you no longer need the logs or intermediates. `-P` will generate an input file for variant calling from your inputs file.
 
 ## Variant Calling
 
