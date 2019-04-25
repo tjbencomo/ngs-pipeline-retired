@@ -26,10 +26,6 @@ import gzip
 import subprocess
 import pandas as pd
 
-# 1 Read user input file
-# Check each sample for requirements?
-# Create pipeline dir
-# Write jobs and submit
 
 # TODO
 # 1) Ask Michael about read groups and figure out how to read them
@@ -54,9 +50,15 @@ def parse_args():
     parser.add_argument('-P', '--prep_inputs', action='store_true', 
                             help='Generate input file for variant calling')
     args = parser.parse_args()
+
+    if os.path.isabs(args.pipeline_dir[0]) is False:
+        pipeline_dir = os.path.join(os.getcwd(), args.pipeline_dir[0])
+    else:
+        pipeline_dir = args.pipeline_dir[0]
+    
     return {'input': args.samples[0], 
             'refs' : args.ref_files[0], 
-            'workdir' : args.pipeline_dir[0],
+            'workdir' : pipeline_dir,
             'prep' : args.prep_inputs}
 
 def verify_workdir(workdir):
@@ -258,29 +260,30 @@ def prepare_calling_inputs(df, refs):
     '''
     Generate input file for the variant calling pipeline from sample inputs
     '''
-    df['analysis_bam'] = df['SamplePrefix'] + df['Sample'] + '.' + refs['ref_name'] + '.bam'
+    df['analysis_bam'] = df.apply(lambda x: os.path.join(x['OutputDirectory'], x['SamplePrefix'] + x['Sample'] + '.' + refs['ref_name'] + '.bam'), axis=1)
     call_inputs = df.pivot(index='Sample', columns='Type', values='analysis_bam')
     call_inputs = call_inputs.rename(columns = {'Normal' : 'NormalBAM', 'Tumor' : 'TumorBAM'})
-    call_inputs['NormalSample'] = call_inputs['NormalBAM'].str.split('.').str[0]
-    call_inputs['TumorSample'] = call_inputs['TumorBAM'].str.split('.').str[0]
+    call_inputs['NormalSample'] = call_inputs['NormalBAM'].map(lambda x: os.path.basename(x)).str.split('.').str[0]
+    call_inputs['TumorSample'] = call_inputs['TumorBAM'].map(lambda x: os.path.basename(x)).str.split('.').str[0]
     call_inputs = call_inputs.reset_index()
     del call_inputs.columns.name
     call_inputs = pd.merge(call_inputs, df[['Sample', 'OutputDirectory']].drop_duplicates(), how='left')
-    return df
+    return call_inputs
 
 def main():
     args = parse_args()
+    print(args)
     verify_workdir(args['workdir'])
     df = read_input(args['input'])
     refs = read_references(args['refs'])
     if check_requirements(df) is False:
         raise ValueError("Input file incorrect, check to make sure nothing is missing!")
     df['ID'] = extract_read_info(df['FASTQ1'])
-    df.apply(launch_pipeline, args=(refs, args['workdir']), axis=1)
+    # df.apply(launch_pipeline, args=(refs, args['workdir']), axis=1)
     if args['prep']:
         prepare_calling_inputs(df, refs)
         call_inputs = prepare_calling_inputs(df, refs)
-        call_inputs.to_csv(index=False)
+        call_inputs.to_csv('samples_calling.csv', index=False)
 
 
 if __name__ == '__main__':
