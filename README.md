@@ -1,10 +1,10 @@
-# variant-discovery-pipeline
+# ngs-pipeline
 **CURRENTLY A WORK IN PROGRESS**
 
-`variant-discovery-pipeline` is a pipeline for variant calling WES and WGS data. The Broad's GATK software is used
+`ngs-pipeline` is a pipeline for variant calling WES and WGS data. The Broad's GATK software is used
 for much of the preprocessing and variant calling. Annovar annotates the identified variants. The `README.md` documents
 all necessary steps to run variant calling on raw FASTQ data from quality control to variant annotation. In its current
-state, `variant-discovery-pipeline` only works on the Sherlock HPC cluster at Stanford. 
+state, `ngs-pipeline` only works on the Sherlock HPC cluster at Stanford. 
 
 1. [Quality Control](#quality-control)
 2. [Preprocessing](#preprocessing)
@@ -44,13 +44,13 @@ Instead, BaseRecalibration can usually account
 for poor quality reads used by Mutect2. 
 
 ## Preprocessing
-`variant-discovery-pipeline` follows a modified version of the Broad's 
+`ngs-pipeline` follows a modified version of the Broad's 
 [Best Practices Pipelines for Variant Discovery](https://software.broadinstitute.org/gatk/best-practices/workflow).
 Not all scatter operations are performed to save time waiting on excess SLURM jobs. 
 
 Preprocessing requires 2 items from the user. First, the user must provide an inputs file describing each sample, its FASTQ files,
 Library ID, and the directory where the preprocessed files should be saved. This info should be saved in a `.csv` or `.xlsx` file. 
-A reference file must also be specified that tells `variant-discovery-pipeline` where to look for items like the reference genome fasta,
+A reference file must also be specified that tells `ngs-pipeline` where to look for items like the reference genome fasta,
 `cromwell` jar, and email address to notify the user of pipeline failure. Reference genome files can be downloaded from the [Broad's
 Resource Bundle](https://software.broadinstitute.org/gatk/download/bundle) over FTP. Cromwell executables can be found on 
 [Github](https://github.com/broadinstitute/cromwell/releases).
@@ -102,15 +102,15 @@ Modified implementation of the Broad's [Best Practices Pipelines for Variant Dis
 ## Example Commands
 ### Using `preprocess_samples.py`
 ```
-python /home/groups/carilee/software/variant-discovery-pipeline/preprocess_samples.py -d /scratch/groups/carilee/cromwell-test/short-data/
+python /home/groups/carilee/software/ngs-pipeline/preprocess_samples.py -d /scratch/groups/carilee/cromwell-test/short-data/
 ```
 This creates a customized input file for CTR119_short and then launches an sbatch job to control the cromwell process.  
 ### Running cromwell manually
 With the local backend
 ```
-java -jar /home/groups/carilee/software/cromwell-35.jar run /home/groups/carilee/software/variant-discovery-pipeline/scripts/preprocessing.wdl -i /home/groups/carilee/software/variant-discovery-pipeline/inputs/preprocessing.json
+java -jar /home/groups/carilee/software/cromwell-35.jar run /home/groups/carilee/software/ngs-pipeline/scripts/preprocessing.wdl -i /home/groups/carilee/software/ngs-pipeline/inputs/preprocessing.json
 ```
 To use the SLURM backend, specify the config files as `your.conf`
 ```
-java -Dconfig.file=/home/groups/carilee/software/variant-discovery-pipeline/your.conf -jar /home/groups/carilee/software/cromwell-35.jar run /home/groups/carilee/software/variant-discovery-pipeline/scripts/preprocessing.wdl -i /home/groups/carilee/software/variant-discovery-pipeline/inputs/preprocessing.json
+java -Dconfig.file=/home/groups/carilee/software/ngs-pipeline/your.conf -jar /home/groups/carilee/software/cromwell-35.jar run /home/groups/carilee/software/ngs-pipeline/scripts/preprocessing.wdl -i /home/groups/carilee/software/ngs-pipeline/inputs/preprocessing.json
 ```
