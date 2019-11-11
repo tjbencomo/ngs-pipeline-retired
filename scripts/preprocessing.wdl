@@ -38,7 +38,7 @@ workflow PreProcessingForVariantDiscovery {
             read_group = read_group,
             #platform_unit = platform_unit,
             platform = platform,
-            output_file_name = base_file_name + ".unaligned.bam",
+            output_file_name = base_file_name + ".unaligned.bam"
     }
 
     call SamToFastqAndBwaMem {
@@ -48,35 +48,20 @@ workflow PreProcessingForVariantDiscovery {
             output_bam_name = base_file_name + ".unmerged",
             ref_fasta = ref_fasta,
             ref_fasta_index = ref_fasta_index,
-            ref_dict = ref_dict,
+            ref_dict = ref_dict
     }
 
-    call MergeBamAlignment {
+    call MergeMarkSortFix {
         input:
             unaligned_bam = FastqToBam.output_bam,
             bwa_commandline = bwa_commandline,
             bwa_version = GetBwaVersion.version,
             aligned_bam = SamToFastqAndBwaMem.output_bam,
-            output_bam_name = base_file_name + ".aligned.unsorted",
-            ref_fasta = ref_fasta,
-            ref_fasta_index = ref_fasta_index,
-            ref_dict = ref_dict,
-    }
-
-    call MarkDuplicates {
-        input:
-            input_bam = MergeBamAlignment.output_bam,
-            output_bam_name = base_file_name + ".aligned.unsorted.duplicates_marked",
-            metrics_filename = base_file_name + ".duplicate_metrics",
-    }
-
-    call SortAndFixTags {
-        input:
-            input_bam = MarkDuplicates.output_bam,
             output_bam_name = base_file_name + ".aligned.duplicate_marked.sorted",
-            ref_dict = ref_dict,
             ref_fasta = ref_fasta,
             ref_fasta_index = ref_fasta_index,
+            ref_dict = ref_dict,
+            metrics_filename = base_file_name + ".duplicate_metrics"
     }
 
     call CreateSequenceGroupingTSV {
@@ -87,8 +72,8 @@ workflow PreProcessingForVariantDiscovery {
     scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping) {
         call BaseRecalibrator {
             input:
-                input_bam = SortAndFixTags.output_bam,
-                input_bam_index = SortAndFixTags.output_bam_index,
+                input_bam = MergeMarkSortFix.output_bam,
+                input_bam_index = MergeMarkSortFix.output_bam_index,
                 recalibration_report_filename = base_file_name + ".recal_data.csv",
                 sequence_group_interval = subgroup,
                 dbSNP_vcf = dbSNP_vcf,
@@ -97,45 +82,43 @@ workflow PreProcessingForVariantDiscovery {
                 known_indels_sites_indices = known_indels_sites_indices,
                 ref_dict = ref_dict,
                 ref_fasta = ref_fasta,
-                ref_fasta_index = ref_fasta_index,
+                ref_fasta_index = ref_fasta_index
         }
     }
 
     call GatherBqsrReports {
         input:
             input_bqsr_reports = BaseRecalibrator.recalibration_report,
-            output_report_file_name = base_file_name + ".recal_data.csv",
+            output_report_file_name = base_file_name + ".recal_data.csv"
 
     }
 
     scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping_with_unmapped) {
         call ApplyBQSR {
             input:
-                input_bam = SortAndFixTags.output_bam,
-                input_bam_index = SortAndFixTags.output_bam_index,
+                input_bam = MergeMarkSortFix.output_bam,
+                input_bam_index = MergeMarkSortFix.output_bam_index,
                 output_bam_base_name = base_file_name + ".aligned.duplicates_marked.recalibrated",
                 recalibration_report = GatherBqsrReports.output_bqsr_report,
                 sequence_group_interval = subgroup,
                 ref_dict = ref_dict,
                 ref_fasta = ref_fasta,
-                ref_fasta_index = ref_fasta_index,
+                ref_fasta_index = ref_fasta_index
         }
     }
 
     call GatherBamFiles {
         input:
             input_bams = ApplyBQSR.recalibrated_bam,
-            output_bam_base_name = base_file_name,
+            output_bam_base_name = base_file_name
     }
 
-    call CopyOutputs {
-      input:
-        output_directory = output_directory,
-        duplication_metrics = MarkDuplicates.duplicate_metrics,
-        bqsr_report = GatherBqsrReports.output_bqsr_report,
-        analysis_ready_bam = GatherBamFiles.output_bam,
-        analysis_ready_bam_index = GatherBamFiles.output_bam_index,
-        analysis_ready_bam_md5 = GatherBamFiles.output_bam_md5
+    output {
+      File duplication_metrics = MergeMarkSortFix.duplicate_metrics
+      File bqsr_report = GatherBqsrReports.output_bqsr_report
+      File analysis_ready_bam = GatherBamFiles.output_bam
+      File analysis_ready_bam_index = GatherBamFiles.output_bam_index
+      File analysis_ready_bam_md5 = GatherBamFiles.output_bam_md5
     }
 }
 
@@ -148,7 +131,7 @@ task GetBwaVersion {
     }
     runtime {
         runtime_minutes: "5"
-        memory: 1000
+        memory: 500
     }
     output {
         String version = read_string(stdout())
@@ -202,8 +185,6 @@ task SamToFastqAndBwaMem {
     File ref_pac
     File ref_sa
 
-
-
     command {
         set -o pipefail
         set -e
@@ -231,7 +212,11 @@ task SamToFastqAndBwaMem {
     }
 }
 
-task MergeBamAlignment {
+task MergeMarkSortFix {
+    # This combines 3 tasks in the GATK workflow:
+    # 1) MergeBamAlignments
+    # 2) MarkDuplicates
+    # 3) SortAndFixTags
     File unaligned_bam
     String bwa_commandline
     String bwa_version
@@ -240,9 +225,10 @@ task MergeBamAlignment {
     File ref_fasta
     File ref_fasta_index
     File ref_dict
-
-
+    String metrics_filename
+    
     command {
+        set -o pipefail
         module load biology gatk
         gatk MergeBamAlignment \
             --VALIDATION_STRINGENCY SILENT \
@@ -250,7 +236,7 @@ task MergeBamAlignment {
             --ATTRIBUTES_TO_RETAIN X0 \
             --ALIGNED_BAM ${aligned_bam} \
             --UNMAPPED_BAM ${unaligned_bam} \
-            --OUTPUT ${output_bam_name}.bam \
+            --OUTPUT /dev/stdout \
             --REFERENCE_SEQUENCE ${ref_fasta} \
             --PAIRED_RUN true \
             --SORT_ORDER "unsorted" \
@@ -267,56 +253,19 @@ task MergeBamAlignment {
             --PROGRAM_GROUP_NAME "bwamem" \
             --UNMAPPED_READ_STRATEGY COPY_TO_TAG \
             --ALIGNER_PROPER_PAIR_FLAGS true \
-            --UNMAP_CONTAMINANT_READS true
-    }
-    runtime {
-        runtime_minutes: "180"
-        memory: 24000
-    }
-    output {
-        File output_bam = "${output_bam_name}.bam"
-    }
-}
-
-task MarkDuplicates {
-    File input_bam
-    String output_bam_name
-    String metrics_filename
-
-
-    command {
-        module load biology gatk
+            --UNMAP_CONTAMINANT_READS true \
+        | \
         gatk MarkDuplicates \
-            --INPUT ${input_bam} \
-            --OUTPUT ${output_bam_name}.bam \
+            --INPUT /dev/stdin \
+            --OUTPUT /dev/stdout \
             --METRICS_FILE ${metrics_filename} \
             --VALIDATION_STRINGENCY SILENT \
             --OPTICAL_DUPLICATE_PIXEL_DISTANCE 100 \
             --ASSUME_SORT_ORDER "queryname" \
-            --CREATE_MD5_FILE true
-    }
-    runtime {
-        runtime_minutes: "180"
-        memory: 48000
-    }
-    output {
-        File output_bam = "${output_bam_name}.bam"
-        File duplicate_metrics = "${metrics_filename}"
-    }
-}
-
-task SortAndFixTags {
-    File input_bam
-    String output_bam_name
-    File ref_dict
-    File ref_fasta
-    File ref_fasta_index
-    
-    command {
-        set -o pipefail
-        module load biology gatk
+            --CREATE_MD5_FILE true \
+        | \
         gatk SortSam \
-            --INPUT ${input_bam} \
+            --INPUT /dev/stdin \
             --OUTPUT /dev/stdout \
             --SORT_ORDER "coordinate" \
             --CREATE_INDEX false \
@@ -330,13 +279,14 @@ task SortAndFixTags {
             --REFERENCE_SEQUENCE ${ref_fasta}
     }
     runtime {
-        runtime_minutes: "360"
-        memory: 24000
+      runtime_minutes: "720"
+      memory: 48000
     }
     output {
-        File output_bam = "${output_bam_name}.bam"
-        File output_bam_index = "${output_bam_name}.bai"
-        File output_bam_md5 = "${output_bam_name}.bam.md5"
+      File output_bam = "${output_bam_name}.bam"
+      File output_bam_index = "${output_bam_name}.bai"
+      File output_bam_md5 = "${output_bam_name}.bam.md5"
+      File duplicate_metrics = "${metrics_filename}"
     }
 }
 
@@ -527,5 +477,4 @@ task CopyOutputs {
   }
 }
 
-# TODO
-# 2) Fix FastqToSam parameter abbreviation naming
+
